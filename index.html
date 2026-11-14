@@ -1,0 +1,3305 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>JEZERO ATLAS // Planetary Operations & Mission Planning Platform (500 km Radius)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       DESIGN TOKENS: CHUNKBASE-INSPIRED DARK COBALT, OBSIDIAN & ASH-GREY PALETTE
+       ========================================================================== */
+    :root {
+      --cobalt-bright: #0738a8;
+      --cobalt-mid: #052682;
+      --midnight-navy: #03185e;
+      --obsidian-black: #090b0f;
+      --ash-dark: #16191f;
+      --ash-mid: #22262e;
+      --ash-light: #949ba8;
+
+      --bg-canvas: #090b0f;
+      --bg-header: #0e1117;
+      --bg-panel: rgba(3, 24, 94, 0.84);
+      --bg-panel-alt: rgba(14, 17, 23, 0.88);
+      --bg-surface: #16191f;
+      --bg-surface-hover: #22262e;
+      --border-subtle: rgba(148, 155, 168, 0.28);
+      --border-accent: rgba(56, 189, 248, 0.55);
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #949ba8;
+      --accent-primary: #052682;
+      --accent-secondary: #0738a8;
+      --accent-glow: #38bdf8;
+      --shadow-hud: 0 14px 36px rgba(0, 0, 0, 0.82);
+    }
+
+    html.light {
+      --bg-canvas: #e2e8f0;
+      --bg-header: #ffffff;
+      --bg-panel: rgba(255, 255, 255, 0.90);
+      --bg-panel-alt: rgba(248, 250, 252, 0.92);
+      --bg-surface: #f1f5f9;
+      --bg-surface-hover: #e2e8f0;
+      --border-subtle: rgba(22, 25, 31, 0.20);
+      --border-accent: #052682;
+      --text-primary: #090b0f;
+      --text-secondary: #1e293b;
+      --text-muted: #475569;
+      --accent-primary: #052682;
+      --accent-secondary: #0738a8;
+      --accent-glow: #0738a8;
+      --shadow-hud: 0 12px 30px rgba(3, 24, 94, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      overflow: hidden;
+      height: 100dvh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* GPU-Accelerated Translucent HUD Windows */
+    .hud-window {
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-hud);
+      border-radius: 10px;
+      will-change: transform, width, height;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .hud-window.focused {
+      border-color: var(--border-accent);
+    }
+
+    .hud-header-bar {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .win-drag-handle {
+      cursor: move;
+      touch-action: none;
+    }
+
+    /* Corner & Edge Resize Grip */
+    .win-resize-se {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 18px;
+      height: 18px;
+      cursor: nwse-resize;
+      touch-action: none;
+      z-index: 15;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      padding: 3px;
+    }
+    .win-resize-se::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid var(--text-muted);
+      border-bottom: 2px solid var(--text-muted);
+      opacity: 0.75;
+    }
+
+    /* Chunkbase-Style Segmented Navigation Tabs */
+    .nav-tab {
+      position: relative;
+      border-right: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      transition: background-color 0.12s ease, color 0.12s ease;
+      cursor: pointer;
+    }
+    .nav-tab:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-primary);
+    }
+    .nav-tab.active {
+      background: var(--accent-secondary);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Crisp Custom Checkboxes */
+    .chunk-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1.5px solid var(--text-muted);
+      background: var(--bg-surface);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .chunk-checkbox:checked {
+      background: var(--accent-primary);
+      border-color: var(--accent-glow);
+    }
+    .chunk-checkbox:checked::after {
+      content: '';
+      width: 7px;
+      height: 4px;
+      border-left: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      transform: rotate(-45deg) translate(0.5px, -0.5px);
+    }
+
+    /* Custom Scrollbars */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 155, 168, 0.35);
+      border-radius: 999px;
+    }
+
+    /* Primary Orbital Map Canvas */
+    #mapCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+    #mapCanvas.grabbing {
+      cursor: grabbing;
+    }
+    #mapCanvas.route-cursor {
+      cursor: crosshair;
+    }
+
+    /* Custom Range Sliders */
+    input[type="range"].atlas-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(148, 155, 168, 0.32);
+      outline: none;
+    }
+    input[type="range"].atlas-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #ffffff;
+      cursor: pointer;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(1.2); }
+    }
+    .beacon-dot {
+      animation: pulseDot 2.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================
+       COLLAPSIBLE TOP HEADER & CHUNKBASE-STYLE SEGMENTED NAVIGATION BAR
+       ======================================================================== -->
+  <header id="topHeader" class="hud-header-bar z-40 flex-shrink-0">
+    <!-- Collapsible Top Brand & Global Tool Bar -->
+    <div id="headerBrandRow" class="px-3 sm:px-5 py-2 flex items-center justify-between gap-2 border-b border-[var(--border-subtle)]">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg bg-[#052682] border border-sky-400/50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3.6 9h16.8M3.6 15h16.8" />
+            <path d="M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-bold tracking-wider uppercase truncate">JEZERO ATLAS</h1>
+            <span class="hidden lg:inline-block text-[10px] font-mono-tech px-2 py-0.5 rounded bg-[#03185e] text-sky-200 border border-sky-400/35">
+              500 KM RADIUS // 10.0°N–26.9°N • 68.6°E–86.3°E
+            </span>
+          </div>
+          <p class="text-[11px] text-[var(--text-muted)] truncate hidden sm:block">
+            Planetary Operations &amp; Mission Planning Platform • NASA Mars Trek / USGS / MOLA / THEMIS / Mars 2020
+          </p>
+        </div>
+      </div>
+
+      <!-- Global Window & Dataset Controls -->
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        <!-- 3D WebGL Terrain Flyover Window Toggle -->
+        <button id="btnToggle3DWin" title="Open Interactive Three.js 3D Terrain Flyover Window"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-sky-400/45 bg-[#052682] hover:bg-[#0738a8] text-white flex items-center gap-1.5 transition">
+          <span>3D Terrain</span>
+        </button>
+
+        <!-- Stratigraphic Core & Comms Delay Window Toggle -->
+        <button id="btnToggleCoreWin" title="Open Stratigraphic Drill Core & Earth-Mars Comms Delay Window"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] hidden md:flex items-center gap-1 transition">
+          <span>Core &amp; Relay</span>
+        </button>
+
+        <!-- Live NASA Mars Trek WMTS Toggle -->
+        <button id="btnToggleLiveTiles" title="Toggle Live NASA Mars Trek Viking + MRO CTX WMTS Tile Streaming"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] flex items-center gap-1.5 transition">
+          <span id="tileStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="hidden sm:inline" id="tileStatusLabel">DEM + NASA WMTS</span>
+          <span class="sm:hidden">WMTS</span>
+        </button>
+
+        <!-- Reset All Windows Layout -->
+        <button id="btnResetLayout" title="Reset all movable & resizable windows to default positions"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] hidden xl:flex items-center gap-1 transition">
+          <span>Reset Windows</span>
+        </button>
+
+        <!-- Official Sources & Metadata Window -->
+        <button id="btnOpenSources" title="View Official NASA & USGS Dataset Citations, Resolutions & Limitations"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition">
+          Sources
+        </button>
+
+        <!-- Light / Dark Theme Toggle -->
+        <button id="btnThemeToggle" aria-label="Toggle Light or Dark Mode"
+          class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] flex items-center gap-1 transition">
+          <svg id="iconSun" class="w-4 h-4 hidden text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/>
+          </svg>
+          <svg id="iconMoon" class="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <span id="themeLabel" class="hidden md:inline">Dark</span>
+        </button>
+
+        <!-- Collapse Header Banner -->
+        <button id="btnCollapseHeader" title="Collapse/Expand Header Banner"
+          class="p-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition">
+          <svg id="chevronHeader" class="w-4 h-4 transition-transform duration-150" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Segmented Navigation Tabs -->
+    <nav class="flex items-stretch justify-between bg-[var(--bg-header)] text-xs sm:text-sm overflow-x-auto custom-scroll">
+      <div class="flex items-stretch">
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap" data-tab="overview">Overview</button>
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap" data-tab="terrain">Terrain &amp; Landing</button>
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap flex items-center gap-1.5" data-tab="routes">
+          <span>Routes</span>
+          <span id="routeBadge" class="px-1.5 py-0.2 text-[10px] font-mono-tech rounded-full bg-sky-500 text-slate-950 font-bold">3</span>
+        </button>
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap" data-tab="hazards">Hazards (&gt;15°)</button>
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap" data-tab="daynight">Day/Night Sol</button>
+        <button class="nav-tab px-3 sm:px-4 py-2 font-medium whitespace-nowrap" data-tab="resources">Resources</button>
+      </div>
+
+      <div class="hidden md:flex items-center gap-2.5 px-4 text-xs">
+        <span id="solHeaderPill" class="font-mono-tech text-[11px] px-2 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sky-300">
+          LMST 12:00:00 • DAYLIGHT
+        </span>
+        <button id="quickRouteModeBtn" class="px-2.5 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] flex items-center gap-1.5 transition">
+          <span id="quickRouteDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="quickRouteModeText">Map Pin: OFF</span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ========================================================================
+       MAIN VIEWPORT: FULL-BLEED 60FPS CANVAS + MOVABLE & RESIZABLE WINDOWS
+       ======================================================================== -->
+  <main id="mapViewport" class="relative flex-1 w-full h-full overflow-hidden">
+    <canvas id="mapCanvas"></canvas>
+
+    <!-- Bottom-Left Scale Bar, Zoom Readout & Quick Grid Toggle -->
+    <div class="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-col gap-1.5">
+      <div class="px-2.5 py-1.5 rounded-lg bg-[var(--bg-panel)] backdrop-blur-md border border-[var(--border-subtle)] shadow-lg inline-flex items-center gap-3 text-[11px] font-mono-tech pointer-events-auto">
+        <div class="flex flex-col">
+          <span id="scaleLabel" class="text-[10px] text-[var(--text-secondary)] leading-none mb-1">100 km</span>
+          <div id="scaleBarLine" class="h-1.5 border-x-2 border-b-2 border-[var(--text-primary)] w-20"></div>
+        </div>
+        <div class="h-5 w-[1px] bg-[var(--border-subtle)]"></div>
+        <span id="zoomLevelLabel" class="text-[var(--text-muted)]">1.0x</span>
+        <button id="btnQuickGridToggle" class="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-primary)]">
+          Grid: ON
+        </button>
+        <button id="btnQuickContourToggle" class="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-primary)]">
+          Contours: ON
+        </button>
+      </div>
+      <div class="text-[10px] text-[var(--text-muted)] bg-[var(--bg-header)]/85 backdrop-blur-sm px-2 py-0.5 rounded border border-[var(--border-subtle)] max-w-[78vw] truncate">
+        Coverage: 500 km Radius from Jezero (18.4447°N, 77.4508°E) • MOLA / THEMIS / CRISM / Mars 2020 Reference
+      </div>
+    </div>
+
+    <!-- Bottom-Right Zoom (+), Zoom (-), and Recenter Jezero Controls -->
+    <div class="absolute bottom-3 right-3 z-20 flex flex-col gap-1.5">
+      <button id="btnZoomIn" aria-label="Zoom In" title="Zoom In (+)" class="w-10 h-10 rounded-lg bg-[var(--bg-panel)] backdrop-blur-md border border-[var(--border-subtle)] shadow-lg flex items-center justify-center text-lg font-bold hover:bg-[#0738a8] hover:text-white active:scale-95 transition">+</button>
+      <button id="btnZoomOut" aria-label="Zoom Out" title="Zoom Out (-)" class="w-10 h-10 rounded-lg bg-[var(--bg-panel)] backdrop-blur-md border border-[var(--border-subtle)] shadow-lg flex items-center justify-center text-lg font-bold hover:bg-[#0738a8] hover:text-white active:scale-95 transition">−</button>
+      <button id="btnResetView" aria-label="Reset View to Jezero Crater" title="Recenter on Jezero Crater (500 km Regional View)" class="w-10 h-10 rounded-lg bg-[var(--bg-panel)] backdrop-blur-md border border-[var(--border-subtle)] shadow-lg flex items-center justify-center hover:bg-[#0738a8] hover:text-white active:scale-95 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" />
+          <path stroke-linecap="round" d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- ======================================================================
+         WINDOW 1: MOVABLE & RESIZABLE TOP-LEFT "KEY" PANEL (Views & Overlays)
+         ====================================================================== -->
+    <aside id="winKey" data-window="true" class="hud-window z-20"
+           data-x="12" data-y="12" data-w="268" data-h="460"
+           style="width: 268px; height: 460px; min-width: 210px; min-height: 40px;">
+      <div class="win-drag-handle px-3 py-2 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2 bg-black/25 flex-shrink-0">
+        <div class="flex items-center gap-2 pointer-events-none">
+          <span class="px-2 py-0.5 text-xs font-bold tracking-widest uppercase border border-[var(--text-primary)]/45 rounded bg-[#0738a8]/65 text-white">
+            KEY
+          </span>
+          <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">VIEWS &amp; OVERLAYS</span>
+        </div>
+        <button data-collapse="bodyKey" title="Collapse/Expand Panel" class="p-1 rounded hover:bg-white/15 text-[var(--text-secondary)]">
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      <div id="bodyKey" class="p-3 overflow-y-auto custom-scroll space-y-2.5 text-xs flex-1">
+        <!-- Base Map Views -->
+        <div>
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1 flex items-center justify-between">
+            <span>Orbital &amp; Sensor View</span>
+            <span id="activeViewBadge" class="text-[10px] font-mono-tech text-sky-400">SATELLITE</span>
+          </div>
+          <div class="grid grid-cols-1 gap-1" id="viewModeButtons">
+            <button data-view="satellite" class="view-btn active text-left px-2.5 py-1.5 rounded-md border border-sky-400/50 bg-[#0738a8] text-white font-medium flex items-center justify-between">
+              <span>Satellite (Orbital Mosaic)</span>
+              <span class="text-[10px] opacity-80 font-mono-tech">VIS</span>
+            </button>
+            <button data-view="simplified" class="view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between">
+              <span>Simplified Terrain</span>
+              <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">BIOME</span>
+            </button>
+            <button data-view="elevation" class="view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between">
+              <span>Elevation (MOLA DEM)</span>
+              <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">MOLA</span>
+            </button>
+            <button data-view="thermal" class="view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between">
+              <span>Thermal Inertia</span>
+              <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">THEMIS</span>
+            </button>
+            <button data-view="atmospheric" class="view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between">
+              <span>Atmospheric Column</span>
+              <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">Pa / τ</span>
+            </button>
+            <button data-view="slope" class="view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between">
+              <span>Slope Gradient</span>
+              <span class="text-[10px] text-[var(--text-muted)] font-mono-tech">0°–35°</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dynamic Legend Scale -->
+        <div class="p-2 rounded-lg bg-[var(--bg-surface)]/80 border border-[var(--border-subtle)]">
+          <div id="viewLegendTitle" class="text-[10px] font-medium text-[var(--text-secondary)] mb-1">Regional Albedo &amp; Relief Mosaic [ESTIMATED]</div>
+          <div id="viewLegendBar" class="h-2 w-full rounded" style="background: linear-gradient(to right, #1f1b18, #7d6755, #dfd0be);"></div>
+          <div id="viewLegendLabels" class="flex justify-between text-[9px] font-mono-tech text-[var(--text-muted)] mt-1">
+            <span>Basalt</span>
+            <span>Regolith</span>
+            <span>Carbonate</span>
+          </div>
+        </div>
+
+        <!-- Toggleable Map Overlays -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Map Overlays</span>
+            <button id="btnToggleAllLayers" class="text-[10px] text-sky-400 hover:underline">Toggle All</button>
+          </div>
+          <div class="space-y-1">
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" id="chkContours" class="chunk-checkbox layer-toggle" data-layer="contours" checked />
+                <span class="truncate font-medium text-sky-300">Elevation Contours (m)</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-sky-400">250m</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="autoSlopeHazards" checked />
+                <span class="truncate font-medium text-amber-300">Auto &gt;15° Slope Hazards</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-amber-400">EVA</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="landingSpots" checked />
+                <span class="truncate font-medium text-emerald-300">Suitable Landing Spots</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-emerald-400">&lt;5°</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="roverMarkers" checked />
+                <span class="truncate text-sky-300">NASA Rover Imagery Pins</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-sky-400">8 CAM</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="craters" checked />
+                <span class="truncate">Craters &amp; Basins</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-[var(--text-muted)]">RIM</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="hydrology" checked />
+                <span class="truncate">Ancient Riverbeds &amp; Deltas</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-[var(--text-muted)]">3.7Ga</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" class="chunk-checkbox layer-toggle" data-layer="hazards" checked />
+                <span class="truncate">Sand Traps (TARs) &amp; Scarps</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-[var(--text-muted)]">HAZ</span>
+            </label>
+            <label class="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/5 cursor-pointer">
+              <div class="flex items-center gap-2 min-w-0">
+                <input type="checkbox" id="chkGridLines" class="chunk-checkbox" checked />
+                <span class="truncate">Lat / Lon Grid Lines</span>
+              </div>
+              <span class="text-[10px] font-mono-tech text-[var(--text-muted)]">GRID</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="win-resize-se" title="Drag to resize window"></div>
+    </aside>
+
+    <!-- ======================================================================
+         WINDOW 2: MOVABLE & RESIZABLE TOP-RIGHT TELEMETRY, WEATHER & RAD PANEL
+         ====================================================================== -->
+    <aside id="winTelemetry" data-window="true" class="hud-window z-20"
+           data-x="right:12" data-y="12" data-w="296" data-h="405"
+           style="width: 296px; height: 405px; min-width: 230px; min-height: 40px;">
+      <div class="win-drag-handle px-3 py-2 border-b border-[var(--border-subtle)] flex items-center justify-between gap-2 bg-black/25 flex-shrink-0">
+        <div class="flex items-center gap-1.5 pointer-events-none">
+          <span class="w-2 h-2 rounded-full bg-sky-400 beacon-dot"></span>
+          <span class="text-[11px] font-semibold tracking-wider uppercase">TELEMETRY // WEATHER &amp; RAD</span>
+        </div>
+        <button data-collapse="bodyTelemetry" title="Collapse/Expand Panel" class="p-1 rounded hover:bg-white/15 text-[var(--text-secondary)]">
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      <div id="bodyTelemetry" class="p-3 overflow-y-auto custom-scroll space-y-2.5 text-xs flex-1">
+        <!-- Cursor Coordinates & Topographic Readout -->
+        <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] font-mono-tech space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[var(--text-muted)] text-[11px]">Latitude</span>
+            <span id="coordLat" class="font-semibold text-[var(--text-primary)]">18.4447° N</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[var(--text-muted)] text-[11px]">Longitude</span>
+            <span id="coordLon" class="font-semibold text-[var(--text-primary)]">77.4508° E</span>
+          </div>
+          <div class="pt-1 border-t border-[var(--border-subtle)] flex items-center justify-between text-[10px]">
+            <span class="text-[var(--text-muted)]">MOLA Elev / Slope</span>
+            <span id="cursorTerrainReadout" class="text-sky-400">-2,562 m • 1.2°</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-[var(--text-muted)]">Geological Province</span>
+            <span id="cursorProvinceReadout" class="text-[var(--text-secondary)] truncate max-w-[155px]">Jezero Crater Floor</span>
+          </div>
+        </div>
+
+        <!-- MEDA Weather & Atmospheric Model Tracking -->
+        <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1.5">
+          <div class="flex items-center justify-between gap-1">
+            <span class="font-semibold text-[11px] tracking-wide uppercase">Weather &amp; Atmosphere</span>
+            <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-sky-500/20 text-sky-300 border border-sky-500/40">
+              MODELLED
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 font-mono-tech">
+            <div class="p-1.5 rounded bg-[var(--bg-canvas)]/75 border border-[var(--border-subtle)]">
+              <div class="text-[9px] text-[var(--text-muted)]">PRESSURE (EST)</div>
+              <div id="wxPressure" class="text-xs font-bold text-sky-300 mt-0.5">736 Pa</div>
+            </div>
+            <div class="p-1.5 rounded bg-[var(--bg-canvas)]/75 border border-[var(--border-subtle)]">
+              <div class="text-[9px] text-[var(--text-muted)]">MAX / MIN TEMP</div>
+              <div id="wxTemp" class="text-xs font-bold text-amber-300 mt-0.5">-22° / -78°C</div>
+            </div>
+            <div class="p-1.5 rounded bg-[var(--bg-canvas)]/75 border border-[var(--border-subtle)]">
+              <div class="text-[9px] text-[var(--text-muted)]">WIND REGIME</div>
+              <div id="wxWind" class="text-xs font-bold text-emerald-300 mt-0.5">5.8 m/s ESE</div>
+            </div>
+            <div class="p-1.5 rounded bg-[var(--bg-canvas)]/75 border border-[var(--border-subtle)]">
+              <div class="text-[9px] text-[var(--text-muted)]">DUST OPACITY (τ)</div>
+              <div id="wxDust" class="text-xs font-bold text-orange-300 mt-0.5">τ 0.42 (Nominal)</div>
+            </div>
+          </div>
+          <p class="text-[10px] text-[var(--text-muted)] leading-snug">
+            Barometric scale-height &amp; seasonal diurnal estimate calibrated to Perseverance MEDA (Sol 1–1200). Not live telemetry.
+          </p>
+        </div>
+
+        <!-- Radiation Counter View Window -->
+        <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1.5">
+          <div class="flex items-center justify-between gap-1">
+            <span class="font-semibold text-[11px] tracking-wide uppercase">Radiation Counter</span>
+            <span id="radBadge" class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              MSL RAD REF
+            </span>
+          </div>
+          <div class="flex items-center justify-between font-mono-tech bg-[var(--bg-canvas)]/75 px-2.5 py-1.5 rounded border border-[var(--border-subtle)]">
+            <span class="text-[10px] text-[var(--text-muted)]">Surface Dose Rate:</span>
+            <span id="radDoseValue" class="text-xs font-bold text-emerald-400">~0.66 mSv / sol</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="text-[var(--text-muted)]">Scenario:</span>
+            <button id="btnToggleSpeSim" class="px-2 py-0.5 rounded bg-[var(--bg-canvas)] hover:bg-[#0738a8] hover:text-white border border-[var(--border-subtle)] font-mono-tech">
+              Nominal GCR (Toggle SPE)
+            </button>
+          </div>
+          <p class="text-[10px] text-[var(--text-muted)] leading-snug">
+            <strong>Data Limitation:</strong> Perseverance carries no ionizing radiation dosimeter. Baseline values reflect verified MSL Curiosity RAD measurements at Gale Crater.
+          </p>
+        </div>
+      </div>
+      <div class="win-resize-se" title="Drag to resize window"></div>
+    </aside>
+
+    <!-- ======================================================================
+         WINDOW 3: MOVABLE & RESIZABLE CONTEXT TAB DRAWER
+         ====================================================================== -->
+    <section id="winDrawer" data-window="true" class="hud-window hidden z-30 border-sky-400/55"
+             data-x="292" data-y="12" data-w="420" data-h="530"
+             style="width: 420px; height: 530px; min-width: 280px; min-height: 44px;">
+      <div class="win-drag-handle px-3.5 py-2 border-b border-[var(--border-subtle)] bg-[#052682]/92 text-white flex items-center justify-between gap-2 flex-shrink-0">
+        <div class="flex items-center gap-2 min-w-0 pointer-events-none">
+          <span id="drawerTitle" class="text-xs font-bold uppercase tracking-wider truncate">Mission Overview</span>
+          <span id="drawerSubtitle" class="text-[10px] font-mono-tech text-sky-200 truncate">500 km Regional Sector</span>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button data-collapse="drawerContent" title="Collapse/Expand Drawer" class="p-1 rounded hover:bg-white/15 text-white">
+            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="btnCloseDrawer" title="Close Tab Window" class="p-1 rounded hover:bg-white/15 text-white">✕</button>
+        </div>
+      </div>
+
+      <div id="drawerContent" class="p-3.5 overflow-y-auto custom-scroll text-xs space-y-3 flex-1">
+        <!-- Dynamically populated based on active tab -->
+      </div>
+      <div class="win-resize-se" title="Drag to resize window"></div>
+    </section>
+
+    <!-- ======================================================================
+         WINDOW 4: MOVABLE & RESIZABLE NASA ROVER IMAGERY VIEWER PANEL
+         ====================================================================== -->
+    <aside id="winRoverImage" data-window="true" class="hud-window hidden z-30 border-sky-400/60"
+           data-x="12" data-y="bottom:56" data-w="360" data-h="350"
+           style="width: 360px; height: 350px; min-width: 250px; min-height: 44px;">
+      <div class="win-drag-handle px-3 py-2 border-b border-[var(--border-subtle)] bg-[#052682]/92 text-white flex items-center justify-between gap-2 flex-shrink-0">
+        <div class="flex items-center gap-1.5 min-w-0 pointer-events-none">
+          <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-sky-400/20 border border-sky-300/40">NASA JPL</span>
+          <span id="roverImgHeaderTitle" class="text-xs font-bold truncate">Rover Surface Imagery</span>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button data-collapse="bodyRoverImg" title="Collapse/Expand Image Viewer" class="p-1 rounded hover:bg-white/15 text-white">
+            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="btnCloseRoverImg" title="Close Image Window" class="p-1 rounded hover:bg-white/15 text-white">✕</button>
+        </div>
+      </div>
+
+      <div id="bodyRoverImg" class="p-3 overflow-y-auto custom-scroll space-y-2 text-xs flex-1">
+        <div class="relative w-full h-44 rounded-lg overflow-hidden bg-black border border-[var(--border-subtle)]">
+          <img id="roverPhotoEl" src="" alt="NASA Mars 2020 Rover Observation" class="w-full h-full object-cover" />
+          <canvas id="roverFallbackCanvas" width="340" height="176" class="hidden w-full h-full"></canvas>
+          <div id="roverSolBadge" class="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/75 text-white font-mono-tech text-[10px]">
+            SOL 003 // MASTCAM-Z
+          </div>
+          <div id="roverPiaBadge" class="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-[#052682]/90 text-sky-200 font-mono-tech text-[10px]">
+            PIA24428
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <h4 id="roverSiteTitle" class="font-bold text-xs text-[var(--text-primary)] truncate">Octavia E. Butler Landing</h4>
+            <span id="roverSiteCoords" class="font-mono-tech text-[10px] text-sky-400 flex-shrink-0">18.4447°N, 77.4508°E</span>
+          </div>
+          <div id="roverSiteMeta" class="font-mono-tech text-[10px] text-[var(--text-muted)] mt-0.5">
+            Instrument: Mastcam-Z • Resolution: ~1.5 mm/px • NASA/JPL-Caltech/ASU
+          </div>
+          <p id="roverSiteCaption" class="text-[11px] text-[var(--text-secondary)] leading-snug mt-1"></p>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--border-subtle)]">
+          <a id="roverSourceLink" href="https://mars.nasa.gov/mars2020/multimedia/raw-images/" target="_blank" rel="noopener" class="text-[10px] text-sky-400 hover:underline truncate">
+            NASA Photojournal / Mars 2020 Archive ↗
+          </a>
+          <button id="btnAddRoverSiteToRoute" class="px-2 py-1 rounded bg-[#0738a8] hover:bg-[#052682] text-white text-[10px] font-medium flex-shrink-0">
+            + Add Waypoint
+          </button>
+        </div>
+      </div>
+      <div class="win-resize-se" title="Drag to resize window"></div>
+    </aside>
+
+    <!-- ======================================================================
+         WINDOW 5: MOVABLE & RESIZABLE STRATIGRAPHIC CORE & COMMS DELAY WINDOW
+         ====================================================================== -->
+    <aside id="winCoreRelay" data-window="true" class="hud-window hidden z-30 border-emerald-400/50"
+           data-x="right:320" data-y="bottom:56" data-w="370" data-h="370"
+           style="width: 370px; height: 370px; min-width: 270px; min-height: 44px;">
+      <div class="win-drag-handle px-3 py-2 border-b border-[var(--border-subtle)] bg-[#052682]/92 text-white flex items-center justify-between gap-2 flex-shrink-0">
+        <div class="flex items-center gap-1.5 min-w-0 pointer-events-none">
+          <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-emerald-400/20 border border-emerald-300/40 text-emerald-200">CORE &amp; RELAY</span>
+          <span class="text-xs font-bold truncate">Stratigraphy &amp; Light-Time Delay</span>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button data-collapse="bodyCoreRelay" title="Collapse/Expand Window" class="p-1 rounded hover:bg-white/15 text-white">
+            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button id="btnCloseCoreWin" title="Close Window" class="p-1 rounded hover:bg-white/15 text-white">✕</button>
+        </div>
+      </div>
+
+      <div id="bodyCoreRelay" class="p-3 overflow-y-auto custom-scroll space-y-2.5 text-xs flex-1">
+        <!-- Stratigraphic Drill Core Column Selector -->
+        <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[11px] uppercase text-emerald-300">Perseverance Abrasion &amp; Core Columns</span>
+            <span class="text-[9px] font-mono-tech text-[var(--text-muted)]">SHERLOC / PIXL</span>
+          </div>
+          <select id="selectDrillCore" class="w-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)]">
+            <option value="robine">Core #6: Robine (Séítah Olivine Cumulate)</option>
+            <option value="wildcat">Core #12: Wildcat Ridge (Hogwallow Mudstone)</option>
+            <option value="mayaro">Core #17: Mayaro (Upper Fan Sandstone)</option>
+            <option value="sapphire">Core #24: Sapphire Canyon (Cheyava Falls Vein)</option>
+          </select>
+          <div id="stratigraphyGraphic" class="space-y-1 font-mono-tech text-[10px]"></div>
+        </div>
+
+        <!-- Earth-Mars One-Way Light-Time Communications Delay Simulator -->
+        <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[11px] uppercase text-sky-300">Earth–Mars Comms Delay Simulator</span>
+            <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-amber-500/20 text-amber-300">SIMULATED</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono-tech text-[var(--text-muted)]">OWLT:</span>
+            <input id="owltSlider" type="range" min="4" max="24" step="1" value="14" class="atlas-slider flex-1" />
+            <span id="owltLabel" class="font-mono-tech text-xs font-bold text-sky-300">14m 00s</span>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <span id="relayStatusText" class="text-[10px] font-mono-tech text-[var(--text-secondary)]">DSN Goldstone → MRO Electra Relay Ready</span>
+            <button id="btnTestUplink" class="px-2.5 py-1 rounded bg-[#0738a8] hover:bg-[#052682] text-white text-[10px] font-medium flex-shrink-0">
+              Test Uplink
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="win-resize-se" title="Drag to resize window"></div>
+    </aside>
+
+    <!-- ======================================================================
+         WINDOW 6: MOVABLE & RESIZABLE THREE.JS 3D TERRAIN FLYOVER VIEWER
+         ====================================================================== -->
+    <aside id="win3DTerrain" data-window="true" class="hud-window hidden z-35 border-sky-400/65"
+           data-x="160" data-y="70" data-w="520" data-h="400"
+           style="width: 520px; height: 400px; min-width: 300px; min-height: 220px;">
+      <div class="win-drag-handle px-3 py-2 border-b border-[var(--border-subtle)] bg-[#052682]/95 text-white flex items-center justify-between gap-2 flex-shrink-0">
+        <div class="flex items-center gap-2 min-w-0 pointer-events-none">
+          <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-sky-400/25 border border-sky-300/40">WEBGL 3D</span>
+          <span class="text-xs font-bold truncate">3D Regional Relief Flyover (500 km Sector)</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="btn3DExaggeration" class="px-2 py-0.5 rounded bg-black/35 hover:bg-black/55 text-[10px] font-mono-tech border border-white/20">
+            Z-Scale: 8x
+          </button>
+          <button id="btnClose3DWin" title="Close 3D Viewer" class="p-1 rounded hover:bg-white/15 text-white">✕</button>
+        </div>
+      </div>
+
+      <div class="relative flex-1 w-full h-full bg-[#090b0f] overflow-hidden" id="threeContainer">
+        <div class="pointer-events-none absolute bottom-2 left-2.5 px-2 py-1 rounded bg-black/70 text-[10px] font-mono-tech text-slate-200 border border-white/15">
+          Drag to Orbit • Scroll to Zoom • Vertical Relief Exaggerated for Structural Visualization
+        </div>
+      </div>
+      <div class="win-resize-se" title="Drag to resize 3D window"></div>
+    </aside>
+
+    <!-- ======================================================================
+         OFFICIAL DATA SOURCES, RESOLUTIONS & LIMITATIONS MODAL
+         ====================================================================== -->
+    <div id="sourcesModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="rounded-xl bg-[var(--bg-panel-alt)] backdrop-blur-xl border border-sky-400/50 shadow-2xl w-full max-w-2xl p-5 space-y-3 text-xs">
+        <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5">
+          <h2 class="text-sm font-bold uppercase tracking-wider">Official NASA &amp; USGS Datasets, Metadata &amp; Limitations</h2>
+          <button id="btnCloseSources" class="p-1 rounded hover:bg-white/10 text-[var(--text-muted)]">✕</button>
+        </div>
+        <p class="text-[var(--text-secondary)] leading-relaxed">
+          All reference coordinates, geological units, and rover images are derived from official NASA and USGS repositories. Where continuous high-resolution orbital tiles or live rover telemetry are unavailable in-browser, modelled/estimated layers are explicitly tagged as <strong>[ESTIMATED]</strong> or <strong>[SIMULATED]</strong>.
+        </p>
+        <div class="space-y-2 font-mono-tech text-[11px] bg-black/35 p-3 rounded-lg border border-[var(--border-subtle)] max-h-72 overflow-y-auto custom-scroll">
+          <div>
+            <div class="text-sky-300 font-bold">1. NASA Mars Trek WMTS &amp; MRO CTX / Viking Mosaics</div>
+            <div class="text-[var(--text-muted)]">URL: <a href="https://trek.nasa.gov/mars/" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://trek.nasa.gov/mars/</a> | API: <a href="https://trek.nasa.gov/tiles/apidoc/trekAPI.html?body=mars" target="_blank" rel="noopener" class="text-sky-400 hover:underline">trekAPI.html?body=mars</a></div>
+            <div class="text-[10px] text-slate-300">Resolution: 232 m/px (Viking MDIM 2.1) &amp; 6 m/px (MRO CTX) • Limitation: Cross-origin tile streaming depends on browser/network policy; falls back to procedural regional relief model.</div>
+          </div>
+          <div>
+            <div class="text-sky-300 font-bold">2. USGS Astrogeology — MOLA DEM &amp; Jezero Geologic Map (SIM 3464)</div>
+            <div class="text-[var(--text-muted)]">URL: <a href="https://astrogeology-usgs.hub.arcgis.com/pages/interactive-maps-mars" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://astrogeology-usgs.hub.arcgis.com/pages/interactive-maps-mars</a> | <a href="https://pubs.usgs.gov/publication/sim3464" target="_blank" rel="noopener" class="text-sky-400 hover:underline">pubs.usgs.gov/publication/sim3464</a></div>
+            <div class="text-[10px] text-slate-300">Resolution: 463 m/px global MOLA + HRSC/CTX regional synthesis • Limitation: Sub-10m boulders &amp; scarps are below regional grid resolution.</div>
+          </div>
+          <div>
+            <div class="text-sky-300 font-bold">3. NASA Mars 2020 Perseverance Raw Images &amp; JPL Photojournal</div>
+            <div class="text-[var(--text-muted)]">URL: <a href="https://mars.nasa.gov/mars2020/multimedia/raw-images/" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://mars.nasa.gov/mars2020/multimedia/raw-images/</a> | <a href="https://photojournal.jpl.nasa.gov/" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://photojournal.jpl.nasa.gov/</a></div>
+            <div class="text-[10px] text-slate-300">Dates: Sols 003–1250 (2021–2024) • Instruments: Mastcam-Z, Navcam, SHERLOC/WATSON, PIXL.</div>
+          </div>
+          <div>
+            <div class="text-sky-300 font-bold">4. NASA PDS Geosciences Node (CRISM Mineralogy &amp; THEMIS Thermal)</div>
+            <div class="text-[var(--text-muted)]">URL: <a href="https://pds-geosciences.wustl.edu/" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://pds-geosciences.wustl.edu/</a> | <a href="https://worldview.earthdata.nasa.gov/" target="_blank" rel="noopener" class="text-sky-400 hover:underline">https://worldview.earthdata.nasa.gov/</a></div>
+            <div class="text-[10px] text-slate-300">Coverage: Nili Fossae, Jezero Crater, Northeast Syrtis, Isidis Rim (18 m/px targeted CRISM, 100 m/px THEMIS IR).</div>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button id="btnCloseSourcesFooter" class="px-4 py-1.5 rounded bg-[#0738a8] hover:bg-[#052682] text-white font-medium">Close</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       CORE PLANETARY ENGINE: 500 KM DEM, A* ROUTING, 1-SOL MODEL, 3D & WINDOWS
+       ======================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* ----------------------------------------------------------------------
+         1. 500 KM RADIUS REGIONAL COORDINATE SYSTEM
+            Center: Jezero Crater (18.4447°N, 77.4508°E)
+            500 km radius ≈ ±8.45° Latitude, ±8.85° Longitude
+         ---------------------------------------------------------------------- */
+      const MARS_RADIUS_KM = 3389.5;
+      const JEZERO_CENTER = { lat: 18.4447, lon: 77.4508 };
+      const KM_PER_DEG_LAT = 59.158;
+      const KM_PER_DEG_LON = 59.158 * Math.cos((JEZERO_CENTER.lat * Math.PI) / 180);
+
+      const MAP_BOUNDS = {
+        minLon: 68.60, // ~500 km West (Syrtis Major / Nili Fossae)
+        maxLon: 86.30, // ~500 km East (Isidis Planitia Basin)
+        minLat: 10.00, // ~500 km South (Syrtis Major / Libya Montes)
+        maxLat: 26.90  // ~500 km North (Arena Colles / Utopia Transition)
+      };
+
+      const DEM_SIZE = 512;
+      const MARS_SOL_SECONDS = 88775; // 24 hours, 39 minutes, 35 seconds (mean solar sol)
+
+      /* ----------------------------------------------------------------------
+         2. OFFICIAL NASA/JPL ROVER & ORBITAL IMAGERY MARKERS (500 KM SECTOR)
+         ---------------------------------------------------------------------- */
+      const ROVER_IMAGERY_SITES = [
+        {
+          id: 'img-butler',
+          name: 'Octavia E. Butler Landing',
+          lat: 18.4447,
+          lon: 77.4508,
+          sol: 'Sol 003 (Feb 2021)',
+          pia: 'PIA24428',
+          instrument: 'Mastcam-Z 34mm',
+          resolution: '~1.5 mm/px (near-field)',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA24428.jpg',
+          caption: 'First high-resolution color panorama of wind-scoured basaltic soil and pitted volcanic rocks on the Máaz crater floor.',
+          palette: ['#8a6548', '#523b2a', '#c9a684']
+        },
+        {
+          id: 'img-kodiak',
+          name: 'Kodiak Butte & Western Delta',
+          lat: 18.4580,
+          lon: 77.3920,
+          sol: 'Sol 084 (May 2021)',
+          pia: 'PIA24647',
+          instrument: 'Mastcam-Z 110mm',
+          resolution: '~0.5 mm/px @ 2.2 km',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA24647.jpg',
+          caption: 'Inclined deltaic foreset beds and horizontal topset strata proving a persistent ancient lake ~3.7 billion years ago.',
+          palette: ['#9e7756', '#5e4431', '#dfc2a3']
+        },
+        {
+          id: 'img-seitah',
+          name: 'South Séítah Olivine Bedrock',
+          lat: 18.4150,
+          lon: 77.4350,
+          sol: 'Sol 200 (Sep 2021)',
+          pia: 'PIA24836',
+          instrument: 'WATSON / Mastcam-Z',
+          resolution: '~0.2 mm/px',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA24836.jpg',
+          caption: 'Coarse-grained olivine cumulate outcrops altered by aqueous carbonation, sampled via the Robine drill core.',
+          palette: ['#7a5e44', '#3f3023', '#bfa284']
+        },
+        {
+          id: 'img-wildcat',
+          name: 'Wildcat Ridge (Hogwallow Flats)',
+          lat: 18.4720,
+          lon: 77.3810,
+          sol: 'Sol 509 (Jul 2022)',
+          pia: 'PIA25408',
+          instrument: 'SHERLOC / Mastcam-Z',
+          resolution: '~0.1 mm/px',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA25408.jpg',
+          caption: 'Fine-grained sulfate-bearing mudstone deposited as the ancient Jezero lake evaporated; richest organic fluorescence detected to date.',
+          palette: ['#91735a', '#4e3b2c', '#d5ba9c']
+        },
+        {
+          id: 'img-three-forks',
+          name: 'Three Forks Sample Depot',
+          lat: 18.4660,
+          lon: 77.4280,
+          sol: 'Sol 684 (Jan 2023)',
+          pia: 'PIA25681',
+          instrument: 'WATSON / Mastcam-Z',
+          resolution: '~0.3 mm/px',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA25681.jpg',
+          caption: 'First off-world backup sample depot comprising 10 hermetically sealed titanium tubes placed on flat regolith.',
+          palette: ['#87684e', '#4c3a2b', '#cbb094']
+        },
+        {
+          id: 'img-bright-angel',
+          name: 'Bright Angel & Cheyava Falls',
+          lat: 18.4940,
+          lon: 77.3280,
+          sol: 'Sol 1175 (Jul 2024)',
+          pia: 'PIA26368',
+          instrument: 'Mastcam-Z / PIXL',
+          resolution: '~0.15 mm/px',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA26368.jpg',
+          caption: 'Light-toned sulfate-rich mudstones in Neretva Vallis featuring white calcium-sulfate veins and millimeter-scale "leopard spots".',
+          palette: ['#a48b74', '#5b4b3d', '#e4d5c3']
+        },
+        {
+          id: 'img-nili-planum',
+          name: 'Nili Planum Orbital Target',
+          lat: 19.6500,
+          lon: 76.2500,
+          sol: 'MRO HiRISE / CRISM',
+          pia: 'ESP_052640',
+          instrument: 'HiRISE 25 cm/px',
+          resolution: '0.25 m/px (Orbital)',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA22227.jpg',
+          caption: 'Noachian phyllosilicate-bearing plains northwest of Jezero, studied as an extended-mission traverse candidate.',
+          palette: ['#7e6552', '#3f3127', '#c4aa92']
+        },
+        {
+          id: 'img-ne-syrtis',
+          name: 'Northeast Syrtis Layered Mesa',
+          lat: 17.5200,
+          lon: 76.6800,
+          sol: 'MRO HiRISE / CRISM',
+          pia: 'ESP_046191',
+          instrument: 'HiRISE 25 cm/px',
+          resolution: '0.25 m/px (Orbital)',
+          imageUrl: 'https://photojournal.jpl.nasa.gov/jpeg/PIA21843.jpg',
+          caption: 'Contact between Hesperian Syrtis Major lava flows and underlying Noachian clay-carbonate stratigraphy.',
+          palette: ['#6f5846', '#33271f', '#b59a82']
+        }
+      ];
+
+      /* ----------------------------------------------------------------------
+         3. SHAPE-CODED MARS RESOURCES & MATERIALS (500 KM SECTOR)
+         ---------------------------------------------------------------------- */
+      const MARS_RESOURCES = [
+        {
+          id: 'res-clays',
+          name: 'Hydrated Phyllosilicates (Smectite Clays)',
+          shape: 'circle',
+          shapeLabel: '● Circle',
+          formula: '(Na,Ca)0.3(Al,Mg)2Si4O10(OH)2·nH2O',
+          source: 'MRO CRISM Targeted & Multispectral Mapping (PDS Geosciences)',
+          utility: '4–8 wt% structurally bound H₂O for life support & sintered regolith radiation bricks.',
+          color: '#10b981',
+          enabled: true,
+          deposits: [
+            { name: 'Jezero Western Delta Fan', lat: 18.46, lon: 77.40, radiusKm: 14, status: 'Confirmed (CRISM/PIXL)' },
+            { name: 'Nili Planum Clay Province', lat: 19.80, lon: 76.10, radiusKm: 42, status: 'Confirmed (CRISM)' },
+            { name: 'Nili Fossae Trough Clays', lat: 21.40, lon: 75.30, radiusKm: 48, status: 'Confirmed (CRISM)' }
+          ]
+        },
+        {
+          id: 'res-carbonates',
+          name: 'Magnesium / Iron Carbonates (Magnesite)',
+          shape: 'diamond',
+          shapeLabel: '◆ Diamond',
+          formula: '(Mg,Fe)CO3',
+          source: 'MRO CRISM & Perseverance SHERLOC/PIXL (2021–2024)',
+          utility: 'Biosignature preservation host & in-situ CO₂ chemical feedstock.',
+          color: '#38bdf8',
+          enabled: true,
+          deposits: [
+            { name: 'Jezero Marginal Carbonate Unit', lat: 18.52, lon: 77.36, radiusKm: 12, status: 'Confirmed (PIXL)' },
+            { name: 'Nili Fossae Carbonate Belt', lat: 20.60, lon: 76.40, radiusKm: 36, status: 'Confirmed (CRISM)' },
+            { name: 'NE Syrtis Carbonate-Olivine Contact', lat: 17.45, lon: 76.70, radiusKm: 30, status: 'Confirmed (CRISM)' }
+          ]
+        },
+        {
+          id: 'res-olivine',
+          name: 'Olivine & Magnesium-Rich Cumulates',
+          shape: 'triangle',
+          shapeLabel: '▲ Triangle',
+          formula: '(Mg,Fe)2SiO4',
+          source: 'Mars Odyssey THEMIS / MRO CRISM / Perseverance SuperCam',
+          utility: 'Magnesium/iron silicate ore & low-alkali basaltic construction aggregate.',
+          color: '#f59e0b',
+          enabled: true,
+          deposits: [
+            { name: 'Séítah Olivine Cumulate', lat: 18.41, lon: 77.44, radiusKm: 11, status: 'Confirmed (SuperCam)' },
+            { name: 'NE Syrtis Regional Olivine Sheet', lat: 16.80, lon: 76.20, radiusKm: 55, status: 'Confirmed (CRISM)' },
+            { name: 'Isidis Inner Rim Olivine', lat: 17.90, lon: 79.40, radiusKm: 45, status: 'Confirmed (CRISM)' }
+          ]
+        },
+        {
+          id: 'res-silica',
+          name: 'Hydrated Opaline Silica',
+          shape: 'hexagon',
+          shapeLabel: '⬡ Hexagon',
+          formula: 'SiO2·nH2O',
+          source: 'MRO CRISM (Tarnas et al. / Carter et al.)',
+          utility: 'High-priority astrobiological microfossil entombment & silica glass feedstock.',
+          color: '#e879f9',
+          enabled: true,
+          deposits: [
+            { name: 'Jezero Western Delta Apron', lat: 18.48, lon: 77.43, radiusKm: 10, status: 'Confirmed (CRISM)' },
+            { name: 'Nili Fossae Silica Outcrops', lat: 21.10, lon: 76.85, radiusKm: 28, status: 'Confirmed (CRISM)' }
+          ]
+        },
+        {
+          id: 'res-ice-sulfates',
+          name: 'Hydrated Sulfates & Subsurface Ice Candidates',
+          shape: 'square',
+          shapeLabel: '■ Square',
+          formula: 'CaSO4·2H2O / MgSO4·nH2O / H2O(s)',
+          source: 'Mars Odyssey GRS / MRO SHARAD / Perseverance Sol 1175',
+          utility: 'Propellant electrolysis (CH₄/LOX) & closed-loop habitat water extraction.',
+          color: '#6366f1',
+          enabled: false,
+          deposits: [
+            { name: 'Neretva Vallis Bright Angel Sulfates', lat: 18.49, lon: 77.33, radiusKm: 9, status: 'Confirmed (Sol 1175)' },
+            { name: 'NE Syrtis Layered Sulfates', lat: 17.30, lon: 76.35, radiusKm: 32, status: 'Confirmed (CRISM)' },
+            { name: 'Northern Arena Colles Subsurface Ice', lat: 24.60, lon: 78.20, radiusKm: 65, status: 'Candidate [MODELLED]' }
+          ]
+        },
+        {
+          id: 'res-basalt-fe',
+          name: 'High-Calcium Pyroxene & Fe/Ti Basalt',
+          shape: 'star',
+          shapeLabel: '★ Star',
+          formula: 'Ca(Mg,Fe)Si2O6 + FeTiO3',
+          source: 'MGS TES / Mars Odyssey THEMIS',
+          utility: 'Iron & titanium metallurgical extraction (Syrtis Major shield province).',
+          color: '#fb7185',
+          enabled: false,
+          deposits: [
+            { name: 'Syrtis Major Volcanic Shield', lat: 13.80, lon: 72.40, radiusKm: 95, status: 'Confirmed (TES/CRISM)' },
+            { name: 'Jezero Máaz Basaltic Floor', lat: 18.38, lon: 77.56, radiusKm: 18, status: 'Confirmed (PIXL)' }
+          ]
+        }
+      ];
+
+      /* ----------------------------------------------------------------------
+         4. SUITABLE LANDING SPOTS, SCIENCE TARGETS & 500 KM LANDMARKS
+         ---------------------------------------------------------------------- */
+      const SUITABLE_LANDING_SPOTS = [
+        { id: 'land-butler', name: 'Octavia E. Butler Plain (Jezero)', lat: 18.445, lon: 77.455, radiusKm: 8, avgSlope: '1.2°', elevM: -2562, score: '98/100' },
+        { id: 'land-jezero-east', name: 'East Jezero Smooth Floor', lat: 18.380, lon: 77.640, radiusKm: 12, avgSlope: '0.9°', elevM: -2580, score: '96/100' },
+        { id: 'land-nili-planum', name: 'Nili Planum Northern Terrace', lat: 19.720, lon: 76.350, radiusKm: 22, avgSlope: '1.5°', elevM: -2080, score: '92/100' },
+        { id: 'land-midway', name: 'Midway / NE Syrtis Plain', lat: 17.550, lon: 76.850, radiusKm: 18, avgSlope: '1.9°', elevM: -1950, score: '90/100' },
+        { id: 'land-isidis-west', name: 'Western Isidis Planitia Apron', lat: 17.800, lon: 81.800, radiusKm: 45, avgSlope: '0.7°', elevM: -3480, score: '95/100' },
+        { id: 'land-isidis-north', name: 'North-Central Isidis Plain', lat: 21.500, lon: 83.200, radiusKm: 52, avgSlope: '0.6°', elevM: -3620, score: '94/100' }
+      ];
+
+      const SCIENCE_RESEARCH_TARGETS = [
+        { id: 'sci-1', name: 'Jezero Western Delta Front Clays', lat: 18.462, lon: 77.412, score: 99 },
+        { id: 'sci-2', name: 'Jezero Marginal Carbonate Belt', lat: 18.515, lon: 77.375, score: 97 },
+        { id: 'sci-3', name: 'Séítah Olivine-Carbonate Contact', lat: 18.420, lon: 77.435, score: 95 },
+        { id: 'sci-4', name: 'Neretva Vallis Inlet Breach', lat: 18.520, lon: 77.150, score: 93 },
+        { id: 'sci-5', name: 'Nili Planum Phyllosilicate Mesa', lat: 19.750, lon: 76.220, score: 94 },
+        { id: 'sci-6', name: 'Northeast Syrtis Layered Sulfates', lat: 17.480, lon: 76.680, score: 92 },
+        { id: 'sci-7', name: 'Nili Fossae Graben Carbonate Ridge', lat: 21.150, lon: 75.800, score: 91 },
+        { id: 'sci-8', name: 'Hargraves Crater Ejecta Megabreccia', lat: 20.750, lon: 75.750, score: 90 },
+        { id: 'sci-9', name: 'Isidis Basin Inner Rim Scarp', lat: 18.100, lon: 79.350, score: 88 },
+        { id: 'sci-10', name: 'Syrtis Major Caldera Margin (Nili Patera)', lat: 11.800, lon: 71.200, score: 89 }
+      ];
+
+      const REGIONAL_FEATURES = [
+        { id: 'f-radius-500', layer: 'craters', type: 'circle', name: '500 km Mission Sector Boundary', lat: JEZERO_CENTER.lat, lon: JEZERO_CENTER.lon, radiusKm: 500, stroke: 'rgba(56, 189, 248, 0.45)', fill: 'transparent', dash: [8, 6] },
+        { id: 'f-jezero-rim', layer: 'craters', type: 'circle', name: 'Jezero Crater Rim (45 km)', lat: 18.44, lon: 77.52, radiusKm: 22.5, stroke: '#fbbf24', fill: 'rgba(245, 158, 11, 0.10)' },
+        { id: 'f-hargraves', layer: 'craters', type: 'circle', name: 'Hargraves Crater (68 km)', lat: 20.75, lon: 75.75, radiusKm: 34, stroke: '#fbbf24', fill: 'rgba(245, 158, 11, 0.10)' },
+        { id: 'f-toro', layer: 'craters', type: 'circle', name: 'Toro Crater (42 km)', lat: 17.04, lon: 71.83, radiusKm: 21, stroke: '#fbbf24', fill: 'rgba(245, 158, 11, 0.10)' },
+        { id: 'f-isidis-rim', layer: 'hydrology', type: 'polyline', name: 'Isidis Planitia Basin Margin', lat: 18.20, lon: 79.50, color: '#3b82f6', widthKm: 8,
+          points: [[78.4, 25.5], [78.8, 22.5], [79.2, 19.5], [79.8, 16.5], [81.2, 13.5], [83.5, 11.2]] },
+        { id: 'f-neretva', layer: 'hydrology', type: 'polyline', name: 'Neretva Vallis Paleochannel', lat: 18.65, lon: 76.85, color: '#22d3ee', widthKm: 3.5,
+          points: [[75.80, 19.10], [76.40, 18.85], [76.95, 18.62], [77.35, 18.46]] },
+        { id: 'f-sava', layer: 'hydrology', type: 'polyline', name: 'Sava Vallis Northern Channel', lat: 19.20, lon: 77.45, color: '#22d3ee', widthKm: 3.0,
+          points: [[77.15, 20.20], [77.35, 19.40], [77.50, 18.70]] },
+        { id: 'f-pliva', layer: 'hydrology', type: 'polyline', name: 'Pliva Vallis Eastern Breach', lat: 18.25, lon: 78.30, color: '#22d3ee', widthKm: 4.0,
+          points: [[77.90, 18.40], [78.40, 18.22], [79.10, 17.95]] },
+        { id: 'f-nili-fossae', layer: 'hazards', type: 'polyline', name: 'Nili Fossae Tectonic Grabens', lat: 21.50, lon: 75.50, color: '#f43f5e', widthKm: 9,
+          points: [[74.2, 24.8], [74.9, 22.4], [75.6, 20.2], [76.1, 18.6]] }
+      ];
+
+      const DRILL_CORE_PROFILES = {
+        robine: {
+          title: 'Core #6: Robine (South Séítah)',
+          sol: 'Sol 298 • Elevation -2,572 m',
+          layers: [
+            { depth: '0–1.5 cm', rock: 'Dust & Fe-Oxide Rind', color: '#9a6b4c', note: 'Aeolian ferric coating' },
+            { depth: '1.5–4.0 cm', rock: 'Carbonate-Altered Olivine', color: '#38bdf8', note: 'Mg-carbonate veinlets (PIXL)' },
+            { depth: '4.0–6.2 cm', rock: 'Coarse Olivine Cumulate', color: '#10b981', note: 'Igneous Fo₅₅ cumulate crystals' }
+          ]
+        },
+        wildcat: {
+          title: 'Core #12: Wildcat Ridge (Western Delta)',
+          sol: 'Sol 509 • Elevation -2,525 m',
+          layers: [
+            { depth: '0–1.2 cm', rock: 'Sulfate Evaporite Crust', color: '#eab308', note: 'Ca/Mg-sulfate lag' },
+            { depth: '1.2–4.5 cm', rock: 'Fine Laminated Mudstone', color: '#8b5cf6', note: 'Peak SHERLOC aromatic organics' },
+            { depth: '4.5–6.0 cm', rock: 'Smectite Clay Siltstone', color: '#10b981', note: 'Low-energy lacustrine settling' }
+          ]
+        },
+        mayaro: {
+          title: 'Core #17: Mayaro (Upper Fan)',
+          sol: 'Sol 642 • Elevation -2,485 m',
+          layers: [
+            { depth: '0–2.0 cm', rock: 'Cross-Bedded Sandstone', color: '#d97706', note: 'High-energy fluvial delta top' },
+            { depth: '2.0–5.8 cm', rock: 'Carbonate-Cemented Grit', color: '#0284c7', note: 'Sub-rounded basalt & olivine clasts' }
+          ]
+        },
+        sapphire: {
+          title: 'Core #24: Sapphire Canyon (Cheyava Falls)',
+          sol: 'Sol 1215 • Elevation -2,460 m',
+          layers: [
+            { depth: '0–1.8 cm', rock: 'Ca-Sulfate Fracture Fill', color: '#f8fafc', note: 'White hydrous sulfate veins' },
+            { depth: '1.8–5.5 cm', rock: 'Reddish Mudstone + Reaction Fronts', color: '#e11d48', note: 'Vivianite/greigite-like "leopard spots"' }
+          ]
+        }
+      };
+
+      /* ----------------------------------------------------------------------
+         5. APPLICATION STATE
+         ---------------------------------------------------------------------- */
+      const state = {
+        theme: 'dark',
+        viewMode: 'satellite',
+        useLiveTiles: true,
+        showGrid: true,
+        activeTab: null,
+        routeClickMode: false,
+        speStormSim: false,
+        layers: {
+          contours: true,
+          autoSlopeHazards: true,
+          landingSpots: true,
+          roverMarkers: true,
+          craters: true,
+          hydrology: true,
+          hazards: true
+        },
+        camera: {
+          centerLon: JEZERO_CENTER.lon,
+          centerLat: JEZERO_CENTER.lat,
+          zoom: 1.0 // Fits full 500 km radius comfortably on initial load
+        },
+        cursor: {
+          lon: JEZERO_CENTER.lon,
+          lat: JEZERO_CENTER.lat
+        },
+        solSim: {
+          timeSec: 43200, // 12:00:00 LMST (Noon)
+          playing: false,
+          speed: 1200 // 1200x real-time (~74 sec per full Mars Sol)
+        },
+        routes: [
+          {
+            id: 'route-1',
+            name: 'Jezero to Nili Planum Traverse',
+            optimizedNote: null,
+            waypoints: [
+              { id: 'w1', name: 'Octavia E. Butler Landing', lat: 18.4447, lon: 77.4508 },
+              { id: 'w2', name: 'Neretva Vallis Inlet', lat: 18.5200, lon: 77.1500 },
+              { id: 'w3', name: 'Nili Planum Terrace', lat: 19.7200, lon: 76.3500 }
+            ]
+          },
+          {
+            id: 'route-2',
+            name: 'Jezero to NE Syrtis Corridor',
+            optimizedNote: null,
+            waypoints: [
+              { id: 'w2-1', name: 'Octavia E. Butler Landing', lat: 18.4447, lon: 77.4508 },
+              { id: 'w2-2', name: 'Northeast Syrtis Mesa', lat: 17.5200, lon: 76.6800 }
+            ]
+          }
+        ],
+        activeRouteId: 'route-1',
+        selectedRoverSite: ROVER_IMAGERY_SITES[0],
+        draggingWaypointIdx: -1
+      };
+
+      function getActiveRoute() {
+        return state.routes.find((r) => r.id === state.activeRouteId) || state.routes[0];
+      }
+
+      /* ----------------------------------------------------------------------
+         6. PRE-COMPUTED 512x512 REGIONAL DEM (500 KM RADIUS) & RASTER BUFFERS
+         ---------------------------------------------------------------------- */
+      const dem = {
+        elev: new Float32Array(DEM_SIZE * DEM_SIZE),
+        albedo: new Float32Array(DEM_SIZE * DEM_SIZE),
+        thermal: new Float32Array(DEM_SIZE * DEM_SIZE),
+        slope: new Float32Array(DEM_SIZE * DEM_SIZE),
+        pressure: new Float32Array(DEM_SIZE * DEM_SIZE),
+        dustTau: new Float32Array(DEM_SIZE * DEM_SIZE),
+        province: new Uint8Array(DEM_SIZE * DEM_SIZE)
+      };
+
+      const PROVINCE_NAMES = [
+        'Nili Fossae Highlands',
+        'Isidis Basin Rim Scarp',
+        'Jezero Crater Floor',
+        'Isidis Planitia Lowlands',
+        'Syrtis Major Volcanic Shield',
+        'Ancient Fluvial Valley'
+      ];
+
+      function hash2(x, y) {
+        const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+        return s - Math.floor(s);
+      }
+
+      function vNoise(x, y) {
+        const ix = Math.floor(x), iy = Math.floor(y);
+        const fx = x - ix, fy = y - iy;
+        const ux = fx * fx * (3 - 2 * fx);
+        const uy = fy * fy * (3 - 2 * fy);
+        const a = hash2(ix, iy), b = hash2(ix + 1, iy);
+        const c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+        return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+      }
+
+      function fbm(x, y, oct = 4) {
+        let v = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < oct; i++) {
+          v += amp * vNoise(x * freq, y * freq);
+          freq *= 2.02;
+          amp *= 0.5;
+        }
+        return v;
+      }
+
+      function segDist(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const l2 = dx * dx + dy * dy;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      }
+
+      function build500KmRegionalDEM() {
+        const dLon = MAP_BOUNDS.maxLon - MAP_BOUNDS.minLon;
+        const dLat = MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat;
+
+        const craters = [
+          { lon: 75.75, lat: 20.75, r: 0.58 }, // Hargraves (68 km)
+          { lon: 71.83, lat: 17.04, r: 0.36 }, // Toro (42 km)
+          { lon: 74.10, lat: 23.40, r: 0.45 },
+          { lon: 76.20, lat: 14.20, r: 0.52 },
+          { lon: 79.10, lat: 24.10, r: 0.48 },
+          { lon: 70.40, lat: 19.80, r: 0.62 }
+        ];
+        for (let i = 0; i < 120; i++) {
+          craters.push({
+            lon: MAP_BOUNDS.minLon + hash2(i, 3.3) * dLon,
+            lat: MAP_BOUNDS.minLat + hash2(i, 7.7) * dLat,
+            r: 0.05 + hash2(i, 1.9) * 0.24
+          });
+        }
+
+        for (let gy = 0; gy < DEM_SIZE; gy++) {
+          const lat = MAP_BOUNDS.maxLat - (gy / (DEM_SIZE - 1)) * dLat;
+          for (let gx = 0; gx < DEM_SIZE; gx++) {
+            const lon = MAP_BOUNDS.minLon + (gx / (DEM_SIZE - 1)) * dLon;
+            const idx = gy * DEM_SIZE + gx;
+
+            const nBroad = fbm(gx * 0.015, gy * 0.015, 4);
+            const nDetail = fbm(gx * 0.085, gy * 0.085, 3);
+
+            // Regional Crustal Dichotomy: West Highlands (-1,600m) -> East Isidis Basin (-3,750m)
+            const isidisDist = Math.hypot((lon - 86.5) * 0.85, (lat - 14.5) * 1.0);
+            let elev = -1750 + (nBroad - 0.5) * 380 + (nDetail - 0.5) * 90;
+            let albedo = 0.54 + (nBroad - 0.5) * 0.22;
+            let thermal = 340 + (nBroad - 0.5) * 90;
+            let prov = 0;
+
+            if (isidisDist < 7.8) {
+              // Deep flat Isidis Planitia impact basin
+              const t = Math.max(0, Math.min(1, (7.8 - isidisDist) / 2.2));
+              elev = -1750 - t * 1950 + (nDetail - 0.5) * 40;
+              albedo = 0.44 + (nDetail - 0.5) * 0.12;
+              thermal = 295 + (nDetail - 0.5) * 45;
+              prov = t > 0.45 ? 3 : 1;
+            }
+
+            // Syrtis Major Volcanic Shield (Southwest quadrant)
+            const syrtisDist = Math.hypot(lon - 70.2, lat - 11.4);
+            if (syrtisDist < 5.2) {
+              const sRise = Math.max(0, 1 - syrtisDist / 5.2);
+              elev += sRise * 1650;
+              albedo = 0.24 + (nDetail - 0.5) * 0.08; // Low-albedo dark basaltic shield
+              thermal = 435;
+              prov = 4;
+            }
+
+            // Nili Fossae Tectonic Grabens (Northwest quadrant)
+            const dFossae1 = segDist(lon, lat, 74.2, 24.8, 76.1, 18.6);
+            const dFossae2 = segDist(lon, lat, 73.2, 24.0, 75.0, 18.2);
+            const minFossae = Math.min(dFossae1, dFossae2);
+            if (minFossae < 0.28) {
+              elev -= Math.cos((minFossae / 0.28) * (Math.PI / 2)) * 680;
+              prov = 1;
+            }
+
+            // Jezero Crater Basin (45 km diameter at 18.44°N, 77.52°E)
+            const jDistKm = Math.hypot((lon - 77.52) * KM_PER_DEG_LON, (lat - 18.44) * KM_PER_DEG_LAT);
+            const jNorm = jDistKm / 22.5;
+            if (jNorm < 0.88) {
+              elev = -2575 - (1 - jNorm / 0.88) * 35 + (nDetail - 0.5) * 20;
+              albedo = 0.36 + (nDetail - 0.5) * 0.12;
+              thermal = 365;
+              prov = 2;
+            } else if (jNorm < 1.15) {
+              const rimT = Math.max(0, 1 - Math.abs(jNorm - 1.0) / 0.15);
+              elev += rimT * 420;
+              prov = 1;
+            }
+
+            // Neretva, Sava & Pliva Valleys
+            const dChannel = Math.min(
+              segDist(lon, lat, 75.80, 19.10, 77.35, 18.46),
+              segDist(lon, lat, 77.15, 20.20, 77.50, 18.70),
+              segDist(lon, lat, 77.90, 18.40, 79.10, 17.95)
+            );
+            if (dChannel < 0.09) {
+              elev -= Math.cos((dChannel / 0.09) * (Math.PI / 2)) * 280;
+              prov = 5;
+            }
+
+            // Regional Impact Craters
+            for (let c = 0; c < craters.length; c++) {
+              const cr = craters[c];
+              const cd = Math.hypot(lon - cr.lon, lat - cr.lat) / cr.r;
+              if (cd < 1.25) {
+                if (cd < 1.0) {
+                  elev -= (1 - cd * cd) * (cr.r * 920);
+                  albedo -= 0.05;
+                } else {
+                  const rim = Math.max(0, 1 - Math.abs(cd - 1.10) / 0.15);
+                  elev += rim * (cr.r * 280);
+                }
+              }
+            }
+
+            dem.elev[idx] = elev;
+            dem.albedo[idx] = Math.max(0.08, Math.min(0.95, albedo));
+            dem.thermal[idx] = Math.max(180, Math.min(520, thermal));
+            dem.province[idx] = prov;
+            dem.pressure[idx] = 618 * Math.exp(-elev / 11100);
+            dem.dustTau[idx] = Math.max(0.25, Math.min(0.90, 0.36 + (-elev - 1800) * 0.00011 + (nBroad - 0.5) * 0.14));
+          }
+        }
+
+        // Compute Geodesic Slope (Degrees) across the 500 km radius grid
+        const cellWM = ((dLon * KM_PER_DEG_LON) * 1000) / DEM_SIZE;
+        const cellHM = ((dLat * KM_PER_DEG_LAT) * 1000) / DEM_SIZE;
+        for (let gy = 0; gy < DEM_SIZE; gy++) {
+          for (let gx = 0; gx < DEM_SIZE; gx++) {
+            const idx = gy * DEM_SIZE + gx;
+            const xm = Math.max(0, gx - 1), xp = Math.min(DEM_SIZE - 1, gx + 1);
+            const ym = Math.max(0, gy - 1), yp = Math.min(DEM_SIZE - 1, gy + 1);
+            const dzdx = (dem.elev[gy * DEM_SIZE + xp] - dem.elev[gy * DEM_SIZE + xm]) / (2 * cellWM);
+            const dzdy = (dem.elev[yp * DEM_SIZE + gx] - dem.elev[ym * DEM_SIZE + gx]) / (2 * cellHM);
+            // Regional scale factor highlights true >15° scarps, graben walls, crater rims & shield flanks
+            dem.slope[idx] = (Math.atan(Math.hypot(dzdx, dzdy) * 4.2) * 180) / Math.PI;
+          }
+        }
+      }
+
+      const rasterCache = {};
+      function getLayerBuffer(mode) {
+        if (rasterCache[mode]) return rasterCache[mode];
+        const off = document.createElement('canvas');
+        off.width = DEM_SIZE;
+        off.height = DEM_SIZE;
+        const octx = off.getContext('2d');
+        const img = octx.createImageData(DEM_SIZE, DEM_SIZE);
+        const data = img.data;
+
+        for (let gy = 0; gy < DEM_SIZE; gy++) {
+          for (let gx = 0; gx < DEM_SIZE; gx++) {
+            const idx = gy * DEM_SIZE + gx;
+            const p = idx * 4;
+            const xm = Math.max(0, gx - 1), ym = Math.max(0, gy - 1);
+            const dx = dem.elev[idx] - dem.elev[gy * DEM_SIZE + xm];
+            const dy = dem.elev[idx] - dem.elev[ym * DEM_SIZE + gx];
+            const shade = Math.max(0.45, Math.min(1.45, 1.0 - (dx * 0.008 + dy * 0.008)));
+            let r = 100, g = 90, b = 80;
+
+            if (mode === 'satellite') {
+              const alb = dem.albedo[idx] * shade;
+              r = Math.min(255, Math.max(14, alb * 238 + 16));
+              g = Math.min(255, Math.max(14, alb * 194 + 14));
+              b = Math.min(255, Math.max(14, alb * 158 + 14));
+            } else if (mode === 'simplified') {
+              const prov = dem.province[idx];
+              const checker = ((Math.floor(gx / 8) + Math.floor(gy / 8)) % 2 === 0) ? 1.03 : 0.97;
+              if (prov === 0) { r = 74; g = 82; b = 96; }        // Highlands
+              else if (prov === 1) { r = 148; g = 122; b = 96; }  // Basin/Graben Rim
+              else if (prov === 2) { r = 24; g = 68; b = 142; }   // Jezero Floor
+              else if (prov === 3) { r = 20; g = 104; b = 152; }  // Isidis Lowlands
+              else if (prov === 4) { r = 56; g = 46; b = 52; }    // Syrtis Basalt
+              else { r = 34; g = 148; b = 168; }                  // Fluvial Channel
+              r *= checker; g *= checker; b *= checker;
+            } else if (mode === 'elevation') {
+              const t = Math.max(0, Math.min(1, (dem.elev[idx] + 3800) / 3600));
+              if (t < 0.25) { const k = t / 0.25; r = 12 + k * 24; g = 34 + k * 88; b = 128 + k * 96; }
+              else if (t < 0.52) { const k = (t - 0.25) / 0.27; r = 36 + k * 42; g = 122 + k * 78; b = 224 - k * 86; }
+              else if (t < 0.78) { const k = (t - 0.52) / 0.26; r = 78 + k * 155; g = 200 - k * 34; b = 138 - k * 95; }
+              else { const k = (t - 0.78) / 0.22; r = 233 + k * 20; g = 166 + k * 78; b = 43 + k * 185; }
+              r *= (0.76 + 0.24 * shade); g *= (0.76 + 0.24 * shade); b *= (0.76 + 0.24 * shade);
+            } else if (mode === 'thermal') {
+              const t = Math.max(0, Math.min(1, (dem.thermal[idx] - 200) / 280));
+              r = Math.min(255, t * 255 + 22);
+              g = Math.min(255, Math.pow(t, 1.45) * 220 + 16);
+              b = Math.min(255, (1 - t) * 185 + 35);
+            } else if (mode === 'atmospheric') {
+              const pNorm = Math.max(0, Math.min(1, (dem.pressure[idx] - 600) / 280));
+              r = (18 + pNorm * 88) * (0.85 + 0.15 * shade);
+              g = (52 + pNorm * 145) * (0.85 + 0.15 * shade);
+              b = (140 + (1 - Math.abs(pNorm - 0.5)) * 105) * (0.85 + 0.15 * shade);
+            } else if (mode === 'slope') {
+              const s = dem.slope[idx];
+              if (s < 5) { r = 22; g = 56; b = 94; }
+              else if (s < 10) { r = 32; g = 136; b = 110; }
+              else if (s < 15) { r = 214; g = 158; b = 36; }
+              else { r = 226; g = 48; b = 62; }
+            }
+
+            data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = 255;
+          }
+        }
+        octx.putImageData(img, 0, 0);
+        rasterCache[mode] = off;
+        return off;
+      }
+
+      // Pre-computed Standalone Elevation Contours (250 m major / 100 m minor isolines)
+      let contourBuffer = null;
+      function getContourBuffer() {
+        if (contourBuffer) return contourBuffer;
+        const off = document.createElement('canvas');
+        off.width = DEM_SIZE;
+        off.height = DEM_SIZE;
+        const octx = off.getContext('2d');
+        const img = octx.createImageData(DEM_SIZE, DEM_SIZE);
+        const data = img.data;
+        const interval = 250; // 250m contour lines across the 500 km relief
+
+        for (let gy = 1; gy < DEM_SIZE - 1; gy++) {
+          for (let gx = 1; gx < DEM_SIZE - 1; gx++) {
+            const idx = gy * DEM_SIZE + gx;
+            const b0 = Math.floor(dem.elev[idx] / interval);
+            const bx = Math.floor(dem.elev[idx + 1] / interval);
+            const by = Math.floor(dem.elev[idx + DEM_SIZE] / interval);
+            if (b0 !== bx || b0 !== by) {
+              const isMajor = (Math.abs(b0) % 2 === 0);
+              const p = idx * 4;
+              data[p] = isMajor ? 224 : 148;
+              data[p + 1] = isMajor ? 242 : 163;
+              data[p + 2] = isMajor ? 254 : 184;
+              data[p + 3] = isMajor ? 185 : 105;
+            }
+          }
+        }
+        octx.putImageData(img, 0, 0);
+        contourBuffer = off;
+        return off;
+      }
+
+      // Pre-computed >15° EVA & Forward-Path Slope Hazard Buffer
+      let autoSlopeBuffer = null;
+      function getAutoSlopeBuffer() {
+        if (autoSlopeBuffer) return autoSlopeBuffer;
+        const off = document.createElement('canvas');
+        off.width = DEM_SIZE;
+        off.height = DEM_SIZE;
+        const octx = off.getContext('2d');
+        const img = octx.createImageData(DEM_SIZE, DEM_SIZE);
+        const data = img.data;
+        for (let gy = 0; gy < DEM_SIZE; gy++) {
+          for (let gx = 0; gx < DEM_SIZE; gx++) {
+            const idx = gy * DEM_SIZE + gx;
+            if (dem.slope[idx] > 15.0) {
+              const p = idx * 4;
+              const hatch = ((gx + gy) % 4 === 0);
+              data[p] = 244;
+              data[p + 1] = hatch ? 158 : 63;
+              data[p + 2] = hatch ? 11 : 94;
+              data[p + 3] = hatch ? 160 : 75;
+            }
+          }
+        }
+        octx.putImageData(img, 0, 0);
+        autoSlopeBuffer = off;
+        return off;
+      }
+
+      function sampleDEM(lon, lat) {
+        const u = (lon - MAP_BOUNDS.minLon) / (MAP_BOUNDS.maxLon - MAP_BOUNDS.minLon);
+        const v = (MAP_BOUNDS.maxLat - lat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat);
+        const gx = Math.max(0, Math.min(DEM_SIZE - 1, Math.round(u * (DEM_SIZE - 1))));
+        const gy = Math.max(0, Math.min(DEM_SIZE - 1, Math.round(v * (DEM_SIZE - 1))));
+        const idx = gy * DEM_SIZE + gx;
+        return {
+          elev: Math.round(dem.elev[idx]),
+          slope: dem.slope[idx],
+          thermal: Math.round(dem.thermal[idx]),
+          pressure: Math.round(dem.pressure[idx]),
+          dustTau: dem.dustTau[idx],
+          province: PROVINCE_NAMES[dem.province[idx]] || 'Regional Highlands'
+        };
+      }
+
+      /* ----------------------------------------------------------------------
+         7. A* SAFE & SCIENTIFIC ROUTE OPTIMIZER + DISTANCE / TRAVEL TIME
+         ---------------------------------------------------------------------- */
+      function computeGridPath(startLon, startLat, endLon, endLat) {
+        const GRID = 96;
+        const dLon = MAP_BOUNDS.maxLon - MAP_BOUNDS.minLon;
+        const dLat = MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat;
+        const toCell = (lon, lat) => ({
+          x: Math.max(0, Math.min(GRID - 1, Math.round(((lon - MAP_BOUNDS.minLon) / dLon) * (GRID - 1)))),
+          y: Math.max(0, Math.min(GRID - 1, Math.round(((MAP_BOUNDS.maxLat - lat) / dLat) * (GRID - 1))))
+        });
+        const toGeo = (x, y) => ({
+          lon: MAP_BOUNDS.minLon + (x / (GRID - 1)) * dLon,
+          lat: MAP_BOUNDS.maxLat - (y / (GRID - 1)) * dLat
+        });
+
+        const s = toCell(startLon, startLat);
+        const e = toCell(endLon, endLat);
+        const total = GRID * GRID;
+        const gScore = new Float32Array(total).fill(Infinity);
+        const fScore = new Float32Array(total).fill(Infinity);
+        const cameFrom = new Int32Array(total).fill(-1);
+        const closed = new Uint8Array(total);
+
+        const startIdx = s.y * GRID + s.x;
+        const endIdx = e.y * GRID + e.x;
+        gScore[startIdx] = 0;
+        fScore[startIdx] = Math.hypot(e.x - s.x, e.y - s.y);
+
+        const open = [startIdx];
+        const dirs = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[-1,1,1.414],[1,-1,1.414],[-1,-1,1.414]];
+
+        while (open.length > 0) {
+          let bestPos = 0;
+          for (let i = 1; i < open.length; i++) if (fScore[open[i]] < fScore[open[bestPos]]) bestPos = i;
+          const cur = open[bestPos];
+          if (cur === endIdx) break;
+          open.splice(bestPos, 1);
+          closed[cur] = 1;
+
+          const cx = cur % GRID, cy = (cur / GRID) | 0;
+          for (let d = 0; d < dirs.length; d++) {
+            const nx = cx + dirs[d][0], ny = cy + dirs[d][1];
+            if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID) continue;
+            const nIdx = ny * GRID + nx;
+            if (closed[nIdx]) continue;
+
+            const geo = toGeo(nx, ny);
+            const sample = sampleDEM(geo.lon, geo.lat);
+            let penalty = 1.0;
+            if (sample.slope > 15.0) penalty += 50.0 + (sample.slope - 15.0) * 6.0;
+            else if (sample.slope > 8.0) penalty += (sample.slope - 8.0) * 1.5;
+
+            const tentativeG = gScore[cur] + dirs[d][2] * penalty;
+            if (tentativeG < gScore[nIdx]) {
+              cameFrom[nIdx] = cur;
+              gScore[nIdx] = tentativeG;
+              fScore[nIdx] = tentativeG + Math.hypot(e.x - nx, e.y - ny);
+              if (!open.includes(nIdx)) open.push(nIdx);
+            }
+          }
+        }
+
+        const rawCells = [];
+        let curr = endIdx;
+        while (curr !== -1 && curr !== startIdx) {
+          rawCells.push(toGeo(curr % GRID, (curr / GRID) | 0));
+          curr = cameFrom[curr];
+        }
+        rawCells.reverse();
+        if (rawCells.length <= 2) return [];
+        const step = Math.max(1, Math.floor(rawCells.length / 5));
+        const waypoints = [];
+        for (let i = step; i < rawCells.length - 1; i += step) waypoints.push(rawCells[i]);
+        return waypoints;
+      }
+
+      function optimizeRouteSafest(route) {
+        if (route.waypoints.length < 2) return;
+        const start = route.waypoints[0];
+        const end = route.waypoints[route.waypoints.length - 1];
+        const turns = computeGridPath(start.lon, start.lat, end.lon, end.lat);
+        route.waypoints = [
+          { ...start },
+          ...turns.map((pt, i) => ({ id: `opt-safe-${Date.now()}-${i}`, name: `Safe Corridor ${i + 1}`, lat: pt.lat, lon: pt.lon })),
+          { ...end }
+        ];
+        route.optimizedNote = 'Safest Optimal Path (Avoids >15° Slopes) — [PLANNING ESTIMATE]';
+      }
+
+      function optimizeRouteScientific(route) {
+        if (route.waypoints.length < 2) return;
+        const start = route.waypoints[0];
+        const end = route.waypoints[route.waypoints.length - 1];
+        const directDist = Math.max(1, haversineMarsKm(start.lat, start.lon, end.lat, end.lon));
+
+        // Automatically select the 3 most scientifically valuable research targets between Point A and Point B
+        const top3Science = SCIENCE_RESEARCH_TARGETS
+          .filter((t) => haversineMarsKm(t.lat, t.lon, start.lat, start.lon) > 2.0 && haversineMarsKm(t.lat, t.lon, end.lat, end.lon) > 2.0)
+          .map((t) => {
+            const detourKm = haversineMarsKm(start.lat, start.lon, t.lat, t.lon) + haversineMarsKm(t.lat, t.lon, end.lat, end.lon) - directDist;
+            return { ...t, utility: t.score - detourKm * 0.22 };
+          })
+          .sort((a, b) => b.utility - a.utility)
+          .slice(0, 3)
+          .sort((a, b) => haversineMarsKm(start.lat, start.lon, a.lat, a.lon) - haversineMarsKm(start.lat, start.lon, b.lat, b.lon));
+
+        const anchors = [
+          { ...start },
+          ...top3Science.map((s, i) => ({ id: `sci-${Date.now()}-${i}`, name: `Sci-${i + 1}: ${s.name}`, lat: s.lat, lon: s.lon })),
+          { ...end }
+        ];
+
+        const finalWps = [anchors[0]];
+        for (let i = 0; i < anchors.length - 1; i++) {
+          const legTurns = computeGridPath(anchors[i].lon, anchors[i].lat, anchors[i + 1].lon, anchors[i + 1].lat);
+          if (legTurns.length > 0) {
+            const mid = legTurns[Math.floor(legTurns.length / 2)];
+            finalWps.push({ id: `sci-safe-${Date.now()}-${i}`, name: `Safe Leg ${i + 1}`, lat: mid.lat, lon: mid.lon });
+          }
+          finalWps.push(anchors[i + 1]);
+        }
+        route.waypoints = finalWps;
+        route.optimizedNote = 'Safest + Shortest + Top 3 Science Targets — [PLANNING ESTIMATE]';
+      }
+
+      function computeRouteMetrics(route) {
+        let totalKm = 0;
+        let maxSlope = 0;
+        const samples = [];
+        for (let i = 0; i < route.waypoints.length - 1; i++) {
+          const a = route.waypoints[i], b = route.waypoints[i + 1];
+          const segKm = haversineMarsKm(a.lat, a.lon, b.lat, b.lon);
+          const steps = Math.max(8, Math.min(40, Math.ceil(segKm / 2)));
+          for (let s = 0; s < steps; s++) {
+            const t = s / steps;
+            const lon = a.lon + (b.lon - a.lon) * t;
+            const lat = a.lat + (b.lat - a.lat) * t;
+            const d = sampleDEM(lon, lat);
+            if (d.slope > maxSlope) maxSlope = d.slope;
+            samples.push({ distKm: totalKm + segKm * t, elev: d.elev, slope: d.slope });
+          }
+          totalKm += segKm;
+        }
+        if (route.waypoints.length > 0) {
+          const last = route.waypoints[route.waypoints.length - 1];
+          const dLast = sampleDEM(last.lon, last.lat);
+          samples.push({ distKm: totalKm, elev: dLast.elev, slope: dLast.slope });
+        }
+        // Estimated pressurized rover / EVA traverse speed (~4.2 km/h effective planning rate)
+        const estHours = totalKm / 4.2;
+        return { totalKm, estHours, maxSlope, samples };
+      }
+
+      /* ----------------------------------------------------------------------
+         8. GEODESIC MATH, PROJECTION & LIVE NASA MARS TREK WMTS STREAMING
+         ---------------------------------------------------------------------- */
+      function haversineMarsKm(lat1, lon1, lat2, lon2) {
+        const rad = (d) => (d * Math.PI) / 180;
+        const dLat = rad(lat2 - lat1);
+        const dLon = rad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return MARS_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      const canvas = document.getElementById('mapCanvas');
+      const ctx = canvas.getContext('2d');
+
+      function getPixelsPerDegree() {
+        const baseSpanLon = 18.2; // Fits 500 km radius cleanly at 1.0x
+        return (canvas.clientWidth / baseSpanLon) * state.camera.zoom;
+      }
+
+      function geoToScreen(lon, lat) {
+        const ppd = getPixelsPerDegree();
+        const aspect = KM_PER_DEG_LAT / KM_PER_DEG_LON;
+        const cx = canvas.clientWidth / 2;
+        const cy = canvas.clientHeight / 2;
+        return {
+          x: cx + (lon - state.camera.centerLon) * ppd,
+          y: cy - (lat - state.camera.centerLat) * ppd * aspect
+        };
+      }
+
+      function screenToGeo(x, y) {
+        const ppd = getPixelsPerDegree();
+        const aspect = KM_PER_DEG_LAT / KM_PER_DEG_LON;
+        const cx = canvas.clientWidth / 2;
+        const cy = canvas.clientHeight / 2;
+        return {
+          lon: state.camera.centerLon + (x - cx) / ppd,
+          lat: state.camera.centerLat - (y - cy) / (ppd * aspect)
+        };
+      }
+
+      const tileCache = new Map();
+      function drawLiveNasaTiles() {
+        if (!state.useLiveTiles || state.viewMode !== 'satellite') return;
+        const z = state.camera.zoom >= 8 ? 7 : state.camera.zoom >= 3.5 ? 6 : state.camera.zoom >= 1.6 ? 5 : 4;
+        const cols = Math.pow(2, z + 1);
+        const rows = Math.pow(2, z);
+        const tl = screenToGeo(0, 0);
+        const br = screenToGeo(canvas.clientWidth, canvas.clientHeight);
+
+        const c0 = Math.max(0, Math.floor(((tl.lon + 180) / 360) * cols));
+        const c1 = Math.min(cols - 1, Math.floor(((br.lon + 180) / 360) * cols));
+        const r0 = Math.max(0, Math.floor(((90 - tl.lat) / 180) * rows));
+        const r1 = Math.min(rows - 1, Math.floor(((90 - br.lat) / 180) * rows));
+
+        ctx.save();
+        ctx.globalAlpha = 0.56;
+        for (let r = r0; r <= r1; r++) {
+          for (let c = c0; c <= c1; c++) {
+            const key = `vik/${z}/${r}/${c}`;
+            const p1 = geoToScreen((c / cols) * 360 - 180, 90 - (r / rows) * 180);
+            const p2 = geoToScreen(((c + 1) / cols) * 360 - 180, 90 - ((r + 1) / rows) * 180);
+            let item = tileCache.get(key);
+            if (!item) {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src = `https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/${z}/${r}/${c}.jpg`;
+              item = { img, ok: false };
+              img.onload = () => { item.ok = true; };
+              tileCache.set(key, item);
+            }
+            if (item.ok) ctx.drawImage(item.img, p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+          }
+        }
+        ctx.restore();
+      }
+
+      /* ----------------------------------------------------------------------
+         9. SOLAR ILLUMINATION & DAY/NIGHT TERMINATOR MODEL (1 MARS SOL)
+         ---------------------------------------------------------------------- */
+      function getSolarMetrics() {
+        const frac = (state.solSim.timeSec % MARS_SOL_SECONDS) / MARS_SOL_SECONDS;
+        const hrs = Math.floor(frac * 24);
+        const mins = Math.floor((frac * 24 - hrs) * 60);
+        const secs = Math.floor(((frac * 24 - hrs) * 60 - mins) * 60);
+        const pad = (n) => String(n).padStart(2, '0');
+        const lmstStr = `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+
+        // Subsolar longitude moves 360° westward over 1 Sol (at 12:00 LMST, sun is overhead at 77.45°E)
+        const subsolarLon = JEZERO_CENTER.lon - (frac - 0.5) * 360;
+        const hourAngleRad = (frac - 0.5) * Math.PI * 2;
+        const solarElevDeg = Math.asin(Math.cos(hourAngleRad) * Math.cos((JEZERO_CENTER.lat * Math.PI) / 180)) * (180 / Math.PI);
+        const solarAzDeg = (180 + Math.sin(hourAngleRad) * 95 + 360) % 360;
+
+        return { frac, lmstStr, subsolarLon, solarElevDeg, solarAzDeg };
+      }
+
+      function drawDayNightTerminator(w, h) {
+        const { subsolarLon, solarElevDeg } = getSolarMetrics();
+        // Only apply shadow overlay when away from midday or when Day/Night tab is active
+        if (solarElevDeg > 68 && state.activeTab !== 'daynight') return;
+
+        const grad = ctx.createLinearGradient(0, 0, w, 0);
+        const samples = 12;
+        for (let i = 0; i <= samples; i++) {
+          const sx = (i / samples) * w;
+          const geo = screenToGeo(sx, h / 2);
+          let dLon = ((geo.lon - subsolarLon + 540) % 360) - 180;
+          const cosZ = Math.cos((dLon * Math.PI) / 180) * Math.cos((geo.lat * Math.PI) / 180);
+          // Smooth twilight & night shadow curve
+          let darkness = 0;
+          if (cosZ < 0.25) {
+            darkness = Math.min(0.76, Math.max(0, (0.25 - cosZ) * 1.45));
+          }
+          grad.addColorStop(i / samples, `rgba(2, 6, 23, ${darkness.toFixed(3)})`);
+        }
+        ctx.save();
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      }
+
+      /* ----------------------------------------------------------------------
+         10. CANVAS RENDERING (60FPS)
+         ---------------------------------------------------------------------- */
+      function renderMap() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.fillStyle = state.theme === 'dark' ? '#090b0f' : '#dbe3ee';
+        ctx.fillRect(0, 0, w, h);
+
+        const raster = getLayerBuffer(state.viewMode);
+        const tl = geoToScreen(MAP_BOUNDS.minLon, MAP_BOUNDS.maxLat);
+        const br = geoToScreen(MAP_BOUNDS.maxLon, MAP_BOUNDS.minLat);
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = state.viewMode !== 'simplified';
+        ctx.drawImage(raster, tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        ctx.restore();
+
+        drawLiveNasaTiles();
+
+        // Standalone Elevation Contours Overlay
+        if (state.layers.contours) {
+          ctx.save();
+          ctx.drawImage(getContourBuffer(), tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+          ctx.restore();
+        }
+
+        // Automatic >15° Slope Hazards Overlay
+        if (state.layers.autoSlopeHazards) {
+          ctx.save();
+          ctx.drawImage(getAutoSlopeBuffer(), tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+          ctx.restore();
+        }
+
+        if (state.showGrid) drawLatLonGrid(w, h);
+        drawRegionalFeatures();
+        drawShapeCodedResources();
+        if (state.layers.landingSpots) drawLandingSpots();
+        if (state.layers.roverMarkers) drawRoverMarkers();
+        drawRoutes();
+        drawDayNightTerminator(w, h);
+        updateScaleBar();
+      }
+
+      function drawLatLonGrid(w, h) {
+        const tl = screenToGeo(0, 0);
+        const br = screenToGeo(w, h);
+        const step = state.camera.zoom >= 4.0 ? 0.25 : state.camera.zoom >= 1.8 ? 1.0 : 2.0;
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = state.theme === 'dark' ? 'rgba(148, 155, 168, 0.22)' : 'rgba(5, 38, 130, 0.16)';
+        ctx.fillStyle = state.theme === 'dark' ? 'rgba(203, 213, 225, 0.65)' : 'rgba(9, 11, 15, 0.68)';
+        ctx.font = '10px "JetBrains Mono", monospace';
+
+        for (let lon = Math.floor(tl.lon / step) * step; lon <= br.lon; lon += step) {
+          const { x } = geoToScreen(lon, JEZERO_CENTER.lat);
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+          if (x > 60 && x < w - 60) ctx.fillText(`${lon.toFixed(1)}°E`, x + 4, h - 10);
+        }
+        for (let lat = Math.floor(br.lat / step) * step; lat <= tl.lat; lat += step) {
+          const { y } = geoToScreen(JEZERO_CENTER.lon, lat);
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+          if (y > 40 && y < h - 40) ctx.fillText(`${lat.toFixed(1)}°N`, 10, y - 4);
+        }
+        ctx.restore();
+      }
+
+      function drawRegionalFeatures() {
+        const ppd = getPixelsPerDegree();
+        REGIONAL_FEATURES.forEach((f) => {
+          if (!state.layers[f.layer]) return;
+          ctx.save();
+          if (f.type === 'circle') {
+            const c = geoToScreen(f.lon, f.lat);
+            const rPx = Math.max(6, (f.radiusKm / KM_PER_DEG_LON) * ppd);
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, rPx, 0, Math.PI * 2);
+            ctx.strokeStyle = f.stroke || '#fbbf24';
+            ctx.fillStyle = f.fill || 'rgba(245, 158, 11, 0.12)';
+            if (f.dash) ctx.setLineDash(f.dash);
+            ctx.lineWidth = 1.6;
+            if (f.fill !== 'transparent') ctx.fill();
+            ctx.stroke();
+            if (f.id === 'f-radius-500') {
+              drawPillLabel(f.name, c.x, c.y - rPx + 14, 'rgba(3, 24, 94, 0.88)', '#38bdf8');
+            } else if (state.camera.zoom >= 1.2 || f.id === 'f-jezero-rim') {
+              drawPillLabel(f.name, c.x, c.y - rPx - 8, 'rgba(9, 11, 15, 0.78)');
+            }
+          } else if (f.type === 'polyline') {
+            ctx.beginPath();
+            f.points.forEach(([lon, lat], i) => {
+              const p = geoToScreen(lon, lat);
+              if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            ctx.strokeStyle = f.color;
+            ctx.lineWidth = Math.max(2.2, (f.widthKm / KM_PER_DEG_LON) * ppd * 0.45);
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.72;
+            ctx.stroke();
+            if (state.camera.zoom >= 1.1) {
+              const c = geoToScreen(f.lon, f.lat);
+              drawPillLabel(f.name, c.x, c.y, 'rgba(9, 11, 15, 0.75)');
+            }
+          }
+          ctx.restore();
+        });
+      }
+
+      // Draw Distinct Geometric Shapes for Mars Resources & Minerals
+      function drawResourceShape(shape, cx, cy, r) {
+        ctx.beginPath();
+        if (shape === 'circle') {
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        } else if (shape === 'diamond') {
+          ctx.moveTo(cx, cy - r * 1.25);
+          ctx.lineTo(cx + r * 1.1, cy);
+          ctx.lineTo(cx, cy + r * 1.25);
+          ctx.lineTo(cx - r * 1.1, cy);
+          ctx.closePath();
+        } else if (shape === 'triangle') {
+          ctx.moveTo(cx, cy - r * 1.25);
+          ctx.lineTo(cx + r * 1.15, cy + r * 0.95);
+          ctx.lineTo(cx - r * 1.15, cy + r * 0.95);
+          ctx.closePath();
+        } else if (shape === 'hexagon') {
+          for (let i = 0; i < 6; i++) {
+            const ang = (i * Math.PI) / 3;
+            const px = cx + Math.cos(ang) * r * 1.15;
+            const py = cy + Math.sin(ang) * r * 1.15;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        } else if (shape === 'square') {
+          ctx.rect(cx - r * 0.95, cy - r * 0.95, r * 1.9, r * 1.9);
+        } else if (shape === 'star') {
+          for (let i = 0; i < 10; i++) {
+            const rad = i % 2 === 0 ? r * 1.3 : r * 0.55;
+            const ang = (i * Math.PI) / 5 - Math.PI / 2;
+            const px = cx + Math.cos(ang) * rad;
+            const py = cy + Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        }
+      }
+
+      function drawShapeCodedResources() {
+        const ppd = getPixelsPerDegree();
+        MARS_RESOURCES.forEach((res) => {
+          if (!res.enabled) return;
+          res.deposits.forEach((dep) => {
+            const c = geoToScreen(dep.lon, dep.lat);
+            const rPx = Math.max(12, (dep.radiusKm / KM_PER_DEG_LON) * ppd);
+            ctx.save();
+            // Deposit Zone Footprint
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, rPx, 0, Math.PI * 2);
+            ctx.fillStyle = res.color + '24';
+            ctx.strokeStyle = res.color;
+            ctx.lineWidth = 1.4;
+            ctx.setLineDash([4, 3]);
+            ctx.fill();
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Center Distinct Geometric Shape Marker
+            drawResourceShape(res.shape, c.x, c.y, 7.5);
+            ctx.fillStyle = res.color;
+            ctx.strokeStyle = '#090b0f';
+            ctx.lineWidth = 1.8;
+            ctx.fill();
+            ctx.stroke();
+
+            if (state.camera.zoom >= 1.25) {
+              drawPillLabel(`${dep.name}`, c.x, c.y + 15, 'rgba(3, 24, 94, 0.88)', res.color);
+            }
+            ctx.restore();
+          });
+        });
+      }
+
+      function drawLandingSpots() {
+        const ppd = getPixelsPerDegree();
+        SUITABLE_LANDING_SPOTS.forEach((spot) => {
+          const c = geoToScreen(spot.lon, spot.lat);
+          const rPx = Math.max(10, (spot.radiusKm / KM_PER_DEG_LON) * ppd);
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, rPx, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+          ctx.strokeStyle = '#34d399';
+          ctx.lineWidth = 1.8;
+          ctx.fill(); ctx.stroke();
+          if (state.camera.zoom >= 1.15) {
+            drawPillLabel(`✓ ${spot.name} (${spot.avgSlope})`, c.x, c.y + rPx + 9, 'rgba(6, 78, 59, 0.90)', '#34d399');
+          }
+          ctx.restore();
+        });
+      }
+
+      function drawRoverMarkers() {
+        ROVER_IMAGERY_SITES.forEach((site) => {
+          const p = geoToScreen(site.lon, site.lat);
+          const isSelected = state.selectedRoverSite && state.selectedRoverSite.id === site.id;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(Math.PI / 4);
+          const sz = isSelected ? 8 : 6;
+          ctx.fillStyle = isSelected ? '#38bdf8' : '#0738a8';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.8;
+          ctx.fillRect(-sz, -sz, sz * 2, sz * 2);
+          ctx.strokeRect(-sz, -sz, sz * 2, sz * 2);
+          ctx.rotate(-Math.PI / 4);
+          ctx.translate(-p.x, -p.y);
+          if (state.camera.zoom >= 1.5 || isSelected) {
+            drawPillLabel(`📷 ${site.name}`, p.x, p.y - 16, isSelected ? '#0738a8' : 'rgba(3, 24, 94, 0.92)', '#38bdf8');
+          }
+          ctx.restore();
+        });
+      }
+
+      function drawRoutes() {
+        state.routes.forEach((route) => {
+          const isActive = route.id === state.activeRouteId;
+          const wps = route.waypoints;
+          if (!wps.length) return;
+          ctx.save();
+          if (wps.length > 1) {
+            ctx.beginPath();
+            wps.forEach((wp, i) => {
+              const p = geoToScreen(wp.lon, wp.lat);
+              if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            });
+            if (isActive) {
+              ctx.strokeStyle = '#090b0f';
+              ctx.lineWidth = 5;
+              ctx.stroke();
+              ctx.strokeStyle = '#38bdf8';
+              ctx.lineWidth = 2.6;
+              ctx.setLineDash([7, 4]);
+              ctx.stroke();
+            } else {
+              ctx.strokeStyle = 'rgba(148, 163, 184, 0.42)';
+              ctx.lineWidth = 1.8;
+              ctx.setLineDash([4, 4]);
+              ctx.stroke();
+            }
+            ctx.setLineDash([]);
+          }
+          if (isActive) {
+            wps.forEach((wp, i) => {
+              const p = geoToScreen(wp.lon, wp.lat);
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+              ctx.fillStyle = i === 0 ? '#10b981' : i === wps.length - 1 ? '#f59e0b' : '#0738a8';
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1.8;
+              ctx.stroke();
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 10px "JetBrains Mono", monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(i === 0 ? 'A' : i === wps.length - 1 ? 'B' : String(i), p.x, p.y + 0.5);
+            });
+          }
+          ctx.restore();
+        });
+      }
+
+      function drawPillLabel(text, x, y, bg, borderColor = null) {
+        ctx.save();
+        ctx.font = '500 10px Inter, sans-serif';
+        const w = ctx.measureText(text).width + 10;
+        const h = 15;
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.roundRect(x - w / 2, y - h / 2, w, h, 4);
+        ctx.fill();
+        if (borderColor) {
+          ctx.strokeStyle = borderColor;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y + 0.5);
+        ctx.restore();
+      }
+
+      function updateScaleBar() {
+        const ppd = getPixelsPerDegree();
+        const pxPerKm = ppd / KM_PER_DEG_LON;
+        const rawKm = 90 / pxPerKm;
+        const steps = [1, 2, 5, 10, 25, 50, 100, 200, 250];
+        let chosen = steps[0];
+        for (const s of steps) if (s <= rawKm * 1.3) chosen = s;
+        document.getElementById('scaleLabel').textContent = `${chosen} km`;
+        document.getElementById('scaleBarLine').style.width = `${Math.max(36, Math.round(chosen * pxPerKm))}px`;
+        document.getElementById('zoomLevelLabel').textContent = `${state.camera.zoom.toFixed(1)}x`;
+      }
+
+      /* ----------------------------------------------------------------------
+         11. TELEMETRY, WEATHER & RADIATION PANEL UPDATES
+         ---------------------------------------------------------------------- */
+      function updateTelemetry(lon, lat) {
+        state.cursor.lon = lon;
+        state.cursor.lat = lat;
+        const s = sampleDEM(lon, lat);
+
+        document.getElementById('coordLat').textContent = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}`;
+        document.getElementById('coordLon').textContent = `${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? 'E' : 'W'}`;
+        const slopeFlag = s.slope > 15 ? `⚠ ${s.slope.toFixed(1)}°` : `${s.slope.toFixed(1)}°`;
+        document.getElementById('cursorTerrainReadout').textContent = `${s.elev.toLocaleString()} m • ${slopeFlag}`;
+        document.getElementById('cursorProvinceReadout').textContent = s.province;
+
+        document.getElementById('wxPressure').textContent = `${s.pressure} Pa`;
+        const dayHigh = Math.round(-20 - (s.elev + 2500) * 0.004);
+        const nightLow = Math.round(-79 - (s.elev + 2500) * 0.005);
+        document.getElementById('wxTemp').textContent = `${dayHigh}° / ${nightLow}°C`;
+        const windSpeed = (5.2 + s.slope * 0.35).toFixed(1);
+        document.getElementById('wxWind').textContent = `${windSpeed} m/s ${s.slope > 10 ? 'Slope' : 'ESE'}`;
+        document.getElementById('wxDust').textContent = `τ ${s.dustTau.toFixed(2)} (${s.dustTau > 0.52 ? 'Hazy' : 'Nominal'})`;
+      }
+
+      /* ----------------------------------------------------------------------
+         12. ROVER IMAGERY VIEWER & STRATIGRAPHIC CORE INSPECTOR
+         ---------------------------------------------------------------------- */
+      function openRoverImageryWindow(site) {
+        state.selectedRoverSite = site;
+        const win = document.getElementById('winRoverImage');
+        const imgEl = document.getElementById('roverPhotoEl');
+        const fbCanvas = document.getElementById('roverFallbackCanvas');
+
+        document.getElementById('roverImgHeaderTitle').textContent = site.name;
+        document.getElementById('roverSolBadge').textContent = `${site.sol.toUpperCase()} // ${site.instrument.toUpperCase()}`;
+        document.getElementById('roverPiaBadge').textContent = site.pia;
+        document.getElementById('roverSiteTitle').textContent = site.name;
+        document.getElementById('roverSiteCoords').textContent = `${site.lat.toFixed(4)}°N, ${site.lon.toFixed(4)}°E`;
+        document.getElementById('roverSiteMeta').textContent = `Instrument: ${site.instrument} • Res: ${site.resolution} • NASA/JPL`;
+        document.getElementById('roverSiteCaption').textContent = site.caption;
+
+        imgEl.classList.remove('hidden');
+        fbCanvas.classList.add('hidden');
+        imgEl.onerror = () => {
+          imgEl.classList.add('hidden');
+          fbCanvas.classList.remove('hidden');
+          const fctx = fbCanvas.getContext('2d');
+          const grad = fctx.createLinearGradient(0, 0, 340, 176);
+          grad.addColorStop(0, '#1e293b');
+          grad.addColorStop(0.5, site.palette[0]);
+          grad.addColorStop(1, site.palette[1]);
+          fctx.fillStyle = grad;
+          fctx.fillRect(0, 0, 340, 176);
+          fctx.fillStyle = site.palette[2];
+          fctx.beginPath();
+          fctx.moveTo(0, 115); fctx.lineTo(110, 78); fctx.lineTo(225, 102); fctx.lineTo(340, 72); fctx.lineTo(340, 176); fctx.lineTo(0, 176);
+          fctx.fill();
+          fctx.fillStyle = 'rgba(0,0,0,0.68)';
+          fctx.fillRect(10, 128, 320, 38);
+          fctx.fillStyle = '#f8fafc';
+          fctx.font = '10px "JetBrains Mono", monospace';
+          fctx.fillText(`NASA/JPL ${site.pia} // ${site.instrument}`, 18, 144);
+          fctx.fillStyle = '#93c5fd';
+          fctx.fillText(`ARCHIVAL RECONSTRUCTION • ${site.lat.toFixed(3)}°N ${site.lon.toFixed(3)}°E`, 18, 158);
+        };
+        imgEl.src = site.imageUrl;
+
+        win.classList.remove('hidden');
+        document.getElementById('bodyRoverImg').classList.remove('hidden');
+        focusWindow(win);
+      }
+
+      function renderDrillCoreGraphic(coreKey) {
+        const core = DRILL_CORE_PROFILES[coreKey] || DRILL_CORE_PROFILES.robine;
+        const el = document.getElementById('stratigraphyGraphic');
+        el.innerHTML = `
+          <div class="text-[10px] text-slate-300 mb-1">${core.title} (${core.sol})</div>
+          ${core.layers.map(l => `
+            <div class="flex items-center gap-2 p-1.5 rounded bg-black/35 border border-white/10">
+              <div class="w-3 h-7 rounded-sm flex-shrink-0" style="background:${l.color}"></div>
+              <div class="min-w-0 flex-1">
+                <div class="flex justify-between font-bold text-white">
+                  <span class="truncate">${l.rock}</span>
+                  <span class="text-sky-300 ml-1">${l.depth}</span>
+                </div>
+                <div class="text-[9px] text-slate-400 truncate">${l.note}</div>
+              </div>
+            </div>
+          `).join('')}
+        `;
+      }
+
+      /* ----------------------------------------------------------------------
+         13. ELEVATION PROFILE CANVAS RENDERER (ROUTES TAB)
+         ---------------------------------------------------------------------- */
+      function drawElevationProfileCanvas(metrics) {
+        const profCanvas = document.getElementById('elevationProfileCanvas');
+        if (!profCanvas) return;
+        const pctx = profCanvas.getContext('2d');
+        const w = profCanvas.width;
+        const h = profCanvas.height;
+        pctx.clearRect(0, 0, w, h);
+
+        pctx.fillStyle = 'rgba(9, 11, 15, 0.85)';
+        pctx.fillRect(0, 0, w, h);
+
+        const pts = metrics.samples;
+        if (pts.length < 2) return;
+
+        let minE = Infinity, maxE = -Infinity;
+        pts.forEach((p) => { if (p.elev < minE) minE = p.elev; if (p.elev > maxE) maxE = p.elev; });
+        const spanE = Math.max(50, maxE - minE);
+        const padL = 36, padR = 10, padT = 12, padB = 18;
+        const plotW = w - padL - padR;
+        const plotH = h - padT - padB;
+
+        // Horizontal Grid Lines
+        pctx.strokeStyle = 'rgba(148, 155, 168, 0.2)';
+        pctx.fillStyle = '#949ba8';
+        pctx.font = '9px "JetBrains Mono", monospace';
+        pctx.lineWidth = 1;
+        [0, 0.5, 1].forEach((f) => {
+          const y = padT + f * plotH;
+          pctx.beginPath(); pctx.moveTo(padL, y); pctx.lineTo(w - padR, y); pctx.stroke();
+          const val = Math.round(maxE - f * spanE);
+          pctx.fillText(`${val}m`, 2, y + 3);
+        });
+
+        // Filled Elevation Area
+        pctx.beginPath();
+        pts.forEach((pt, i) => {
+          const x = padL + (i / (pts.length - 1)) * plotW;
+          const y = padT + (1 - (pt.elev - minE) / spanE) * plotH;
+          if (i === 0) pctx.moveTo(x, y); else pctx.lineTo(x, y);
+        });
+        pctx.lineTo(padL + plotW, padT + plotH);
+        pctx.lineTo(padL, padT + plotH);
+        pctx.closePath();
+        pctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        pctx.fill();
+
+        // Topographic Line Segments (Highlighting >15° Slope Hazards in Amber/Red)
+        for (let i = 0; i < pts.length - 1; i++) {
+          const x1 = padL + (i / (pts.length - 1)) * plotW;
+          const y1 = padT + (1 - (pts[i].elev - minE) / spanE) * plotH;
+          const x2 = padL + ((i + 1) / (pts.length - 1)) * plotW;
+          const y2 = padT + (1 - (pts[i + 1].elev - minE) / spanE) * plotH;
+          pctx.beginPath();
+          pctx.moveTo(x1, y1);
+          pctx.lineTo(x2, y2);
+          pctx.strokeStyle = pts[i].slope > 15.0 ? '#f43f5e' : '#38bdf8';
+          pctx.lineWidth = 2;
+          pctx.stroke();
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         14. CONTEXT DRAWER TABS (Overview, Terrain, Routes, Hazards, Day/Night, Resources)
+         ---------------------------------------------------------------------- */
+      function updateRouteBadge() {
+        document.getElementById('routeBadge').textContent = getActiveRoute().waypoints.length;
+      }
+
+      function openTabDrawer(tabKey) {
+        const win = document.getElementById('winDrawer');
+        const tabs = document.querySelectorAll('.nav-tab');
+        if (state.activeTab === tabKey) {
+          state.activeTab = null;
+          win.classList.add('hidden');
+          tabs.forEach((t) => t.classList.remove('active'));
+          return;
+        }
+        state.activeTab = tabKey;
+        tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabKey));
+        win.classList.remove('hidden');
+        document.getElementById('drawerContent').classList.remove('hidden');
+        focusWindow(win);
+        renderDrawerContent();
+      }
+
+      function renderDrawerContent() {
+        const titleEl = document.getElementById('drawerTitle');
+        const subEl = document.getElementById('drawerSubtitle');
+        const bodyEl = document.getElementById('drawerContent');
+
+        if (state.activeTab === 'overview') {
+          titleEl.textContent = 'Regional Mission Overview';
+          subEl.textContent = '500 km Radius Sector';
+          bodyEl.innerHTML = `
+            <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1.5">
+              <div class="font-bold text-[var(--text-primary)]">500 km Radius Regional Coverage</div>
+              <p class="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                Centered on <strong>Jezero Crater (18.4447°N, 77.4508°E)</strong>, this platform spans a ~1,000 km × 1,000 km corridor linking the <strong>Isidis Planitia</strong> impact basin, <strong>Nili Fossae</strong> carbonate/clay grabens, and <strong>Syrtis Major Planum</strong> volcanic shield.
+              </p>
+            </div>
+            <div class="space-y-1.5">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Official NASA Rover &amp; Orbital Imagery Sites</div>
+              ${ROVER_IMAGERY_SITES.map(s => `
+                <div class="p-2 rounded bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="font-semibold text-sky-300 truncate">📷 ${s.name}</div>
+                    <div class="font-mono-tech text-[10px] text-[var(--text-muted)]">${s.sol} • ${s.pia}</div>
+                  </div>
+                  <button onclick="window.jezeroApp.inspectRoverSite('${s.id}')" class="px-2 py-1 rounded bg-[#0738a8] hover:bg-[#052682] text-white text-[10px] flex-shrink-0">
+                    View Image
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else if (state.activeTab === 'terrain') {
+          titleEl.textContent = 'Terrain & Landing Sites';
+          subEl.textContent = 'Slope & Engineering Ellipses';
+          bodyEl.innerHTML = `
+            <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)]">
+              Suitable landing zones are screened for low regional slopes (<strong>&lt;5°</strong>), low boulder thermal inertia roughness, and clear approach corridors.
+            </div>
+            ${SUITABLE_LANDING_SPOTS.map(s => `
+              <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-semibold text-emerald-300 truncate">${s.name}</div>
+                  <div class="font-mono-tech text-[10px] text-[var(--text-muted)]">Mean Slope: ${s.avgSlope} • Elev: ${s.elevM} m • Index: ${s.score}</div>
+                </div>
+                <button onclick="window.jezeroApp.flyTo(${s.lon}, ${s.lat}, 3.2)" class="px-2.5 py-1 rounded bg-[#0738a8] text-white text-[10px] flex-shrink-0">Zoom</button>
+              </div>
+            `).join('')}
+          `;
+        } else if (state.activeTab === 'routes') {
+          const activeRoute = getActiveRoute();
+          const metrics = computeRouteMetrics(activeRoute);
+          titleEl.textContent = 'Routes & Path Optimization';
+          subEl.textContent = `${state.routes.length} Saved Routes`;
+
+          const landmarkOptions = [
+            ...SUITABLE_LANDING_SPOTS.map(s => ({ name: s.name, lat: s.lat, lon: s.lon })),
+            ...ROVER_IMAGERY_SITES.map(s => ({ name: s.name, lat: s.lat, lon: s.lon }))
+          ];
+
+          bodyEl.innerHTML = `
+            <!-- Multi-Route Manager -->
+            <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-2">
+              <div class="flex items-center gap-1.5">
+                <select onchange="window.jezeroApp.selectRoute(this.value)" class="flex-1 bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded px-2 py-1.5 text-xs text-[var(--text-primary)]">
+                  ${state.routes.map(r => `<option value="${r.id}" ${r.id === activeRoute.id ? 'selected' : ''}>${r.name} (${r.waypoints.length} pts)</option>`).join('')}
+                </select>
+                <button onclick="window.jezeroApp.addRoute()" class="px-2.5 py-1.5 rounded bg-[#0738a8] text-white font-medium text-[11px]">+ Add</button>
+                <button onclick="window.jezeroApp.deleteActiveRoute()" class="px-2.5 py-1.5 rounded bg-rose-950/60 text-rose-200 border border-rose-500/40 text-[11px]">Del</button>
+              </div>
+
+              <!-- Point A (Start) & Point B (End) Selector -->
+              <div class="grid grid-cols-2 gap-1.5 text-[10px]">
+                <div>
+                  <label class="text-[var(--text-muted)] block mb-0.5">Point A (Start)</label>
+                  <select onchange="window.jezeroApp.setEndpoint(0, this.value)" class="w-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded px-1.5 py-1 text-[11px]">
+                    <option value="">Custom Map Pin</option>
+                    ${landmarkOptions.map(l => `<option value="${l.lat},${l.lon},${l.name}">${l.name}</option>`).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="text-[var(--text-muted)] block mb-0.5">Point B (Destination)</label>
+                  <select onchange="window.jezeroApp.setEndpoint(-1, this.value)" class="w-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded px-1.5 py-1 text-[11px]">
+                    <option value="">Custom Map Pin</option>
+                    ${landmarkOptions.map(l => `<option value="${l.lat},${l.lon},${l.name}">${l.name}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-1.5 pt-0.5">
+                <button onclick="window.jezeroApp.toggleRouteClickMode()" class="flex-1 py-1.5 px-2 rounded text-[11px] font-medium ${state.routeClickMode ? 'bg-amber-500 text-black font-bold' : 'bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]'}">
+                  ${state.routeClickMode ? '● Click Map to Drop Pin (ON)' : '+ Add Waypoint via Map Click'}
+                </button>
+                <button onclick="window.jezeroApp.exportGeoJSON()" title="Export Route as GIS GeoJSON" class="px-2 py-1.5 rounded bg-[var(--bg-canvas)] hover:bg-[#0738a8] hover:text-white border border-[var(--border-subtle)] font-mono-tech text-[10px]">
+                  .GeoJSON
+                </button>
+                <button onclick="window.jezeroApp.exportCSV()" title="Export Route Waypoints as CSV" class="px-2 py-1.5 rounded bg-[var(--bg-canvas)] hover:bg-[#0738a8] hover:text-white border border-[var(--border-subtle)] font-mono-tech text-[10px]">
+                  .CSV
+                </button>
+              </div>
+            </div>
+
+            <!-- Automated Safe & Top-3 Scientific Route Optimizers -->
+            <div class="p-2.5 rounded-lg bg-[#03185e]/85 border border-sky-400/40 space-y-1.5">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-sky-200">Automated Route Optimization (Point A → Point B)</div>
+              <button onclick="window.jezeroApp.runOptimizeSafe()" class="w-full py-1.5 px-2.5 rounded bg-[#0738a8] hover:bg-blue-600 text-white font-medium text-[11px] flex items-center justify-between">
+                <span>1. Safest Optimal Path (Avoids &gt;15° Slopes)</span>
+                <span class="font-mono-tech text-[10px] text-sky-200">A* SAFE</span>
+              </button>
+              <button onclick="window.jezeroApp.runOptimizeScience()" class="w-full py-1.5 px-2.5 rounded bg-emerald-800/85 hover:bg-emerald-700 text-white font-medium text-[11px] flex items-center justify-between">
+                <span>2. Safest + Shortest + Top 3 Science Targets</span>
+                <span class="font-mono-tech text-[10px] text-emerald-200">+3 SCI</span>
+              </button>
+              ${activeRoute.optimizedNote ? `<div class="text-[10px] font-mono-tech text-emerald-300 bg-black/35 px-2 py-1 rounded">${activeRoute.optimizedNote}</div>` : ''}
+              <div class="text-[10px] text-amber-300 bg-amber-950/45 border border-amber-500/40 px-2 py-1 rounded leading-snug">
+                <strong>PLANNING ESTIMATE ONLY:</strong> Automated routes and travel times use regional orbital DEM estimates rather than guaranteed safe surface navigation.
+              </div>
+            </div>
+
+            <!-- Distance & Estimated Travel Time Summary -->
+            <div class="grid grid-cols-3 gap-1.5 font-mono-tech text-center">
+              <div class="p-2 rounded bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)]">
+                <div class="text-[9px] text-[var(--text-muted)]">EST. DISTANCE</div>
+                <div class="text-xs font-bold text-sky-300 mt-0.5">${metrics.totalKm.toFixed(1)} km</div>
+              </div>
+              <div class="p-2 rounded bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)]">
+                <div class="text-[9px] text-[var(--text-muted)]">EST. TRAVEL TIME</div>
+                <div class="text-xs font-bold text-emerald-300 mt-0.5">${metrics.estHours.toFixed(1)} hrs</div>
+              </div>
+              <div class="p-2 rounded bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)]">
+                <div class="text-[9px] text-[var(--text-muted)]">MAX SLOPE</div>
+                <div class="text-xs font-bold ${metrics.maxSlope > 15 ? 'text-rose-400' : 'text-amber-300'} mt-0.5">${metrics.maxSlope.toFixed(1)}°</div>
+              </div>
+            </div>
+
+            <!-- Interactive Elevation Profile Chart -->
+            <div class="p-2 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1">
+              <div class="flex items-center justify-between text-[10px] font-mono-tech">
+                <span class="text-[var(--text-secondary)]">ROUTE ELEVATION PROFILE (MOLA EST)</span>
+                <span class="text-rose-400">Red = &gt;15° Hazard</span>
+              </div>
+              <canvas id="elevationProfileCanvas" width="365" height="92" class="w-full h-24 rounded border border-[var(--border-subtle)]"></canvas>
+            </div>
+
+            <!-- Waypoint List -->
+            <div class="space-y-1.5">
+              ${activeRoute.waypoints.map((wp, idx) => {
+                const s = sampleDEM(wp.lon, wp.lat);
+                const badge = idx === 0 ? 'A' : idx === activeRoute.waypoints.length - 1 ? 'B' : idx;
+                return `
+                  <div class="p-2 rounded bg-[var(--bg-surface)]/90 border ${s.slope > 15 ? 'border-amber-500/60' : 'border-[var(--border-subtle)]'} flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-1.5">
+                        <span class="w-4 h-4 rounded-full bg-[#0738a8] text-white font-mono-tech text-[10px] flex items-center justify-center flex-shrink-0">${badge}</span>
+                        <input type="text" value="${wp.name}" onchange="window.jezeroApp.renameWaypoint(${idx}, this.value)"
+                          class="bg-transparent border-b border-transparent focus:border-sky-400 outline-none font-medium text-[var(--text-primary)] truncate w-full text-xs" />
+                      </div>
+                      <div class="font-mono-tech text-[10px] text-[var(--text-muted)] mt-0.5 pl-5">
+                        ${wp.lat.toFixed(3)}°N, ${wp.lon.toFixed(3)}°E • Elev: ${s.elev}m • Slope: ${s.slope.toFixed(1)}°
+                      </div>
+                    </div>
+                    <button onclick="window.jezeroApp.deleteWaypoint(${idx})" class="p-1 rounded hover:bg-rose-500/20 text-rose-400">✕</button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+          requestAnimationFrame(() => drawElevationProfileCanvas(metrics));
+        } else if (state.activeTab === 'hazards') {
+          titleEl.textContent = 'Terrain & >15° Slope Hazards';
+          subEl.textContent = 'EVA & Vehicle Mobility Limits';
+          bodyEl.innerHTML = `
+            <div class="p-2.5 rounded-lg bg-amber-950/45 border border-amber-500/50 space-y-1.5">
+              <div class="font-bold text-amber-300">Automatic &gt;15° Slope Hazard Threshold</div>
+              <p class="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                All terrain exceeding <strong>15° incline</strong> is automatically highlighted across the 500 km sector. This threshold reflects engineering limits for <strong>pressurized spacesuit EVA mobility</strong> (center-of-mass stability and metabolic exertion) as well as <strong>steep forward-path rollover/slip limits</strong> for surface rovers.
+              </p>
+            </div>
+            <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] space-y-1.5 text-[11px] text-[var(--text-secondary)]">
+              <div>• <strong>Nili Fossae Graben Scarps (18°–34°):</strong> Deep tectonic fault troughs northwest of Jezero.</div>
+              <div>• <strong>Jezero &amp; Isidis Rim Escarpments (16°–29°):</strong> Steep crater wall talus slopes.</div>
+              <div>• <strong>Transverse Aeolian Ridges (TARs):</strong> Wind-rippled sand traps posing wheel-entrapment hazards.</div>
+            </div>
+          `;
+        } else if (state.activeTab === 'daynight') {
+          const sol = getSolarMetrics();
+          titleEl.textContent = 'Day / Night Mars Sol Simulation';
+          subEl.textContent = '1 Sol = 24h 39m 35s';
+          bodyEl.innerHTML = `
+            <div class="p-2.5 rounded-lg bg-[#03185e]/85 border border-sky-400/45 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sky-200 uppercase text-[11px]">Local Mean Solar Time (Jezero)</span>
+                <span class="px-1.5 py-0.5 text-[9px] font-mono-tech rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">ASTRONOMICAL MODEL</span>
+              </div>
+              <div id="solClockDisplay" class="text-xl font-bold font-mono-tech text-white tracking-wider">${sol.lmstStr} LMST</div>
+              <div class="grid grid-cols-2 gap-1.5 font-mono-tech text-[10px]">
+                <div class="p-1.5 rounded bg-black/35 border border-white/10">
+                  <span class="text-slate-400 block">SOLAR ELEVATION</span>
+                  <span id="solElevDisplay" class="text-sky-300 font-bold">${sol.solarElevDeg.toFixed(1)}°</span>
+                </div>
+                <div class="p-1.5 rounded bg-black/35 border border-white/10">
+                  <span class="text-slate-400 block">SOLAR AZIMUTH</span>
+                  <span id="solAzDisplay" class="text-amber-300 font-bold">${sol.solarAzDeg.toFixed(0)}°</span>
+                </div>
+              </div>
+
+              <!-- Scrubber Timeline -->
+              <div>
+                <input id="solScrubber" type="range" min="0" max="${MARS_SOL_SECONDS}" value="${Math.round(state.solSim.timeSec)}" class="atlas-slider w-full" />
+                <div class="flex justify-between text-[9px] font-mono-tech text-slate-400 mt-0.5">
+                  <span>00:00 (Midnight)</span>
+                  <span>06:00 (Dawn)</span>
+                  <span>12:00 (Noon)</span>
+                  <span>18:00 (Dusk)</span>
+                </div>
+              </div>
+
+              <!-- Playback & Step Controls -->
+              <div class="flex items-center gap-1.5">
+                <button id="btnSolPlayPause" class="flex-1 py-1.5 px-2.5 rounded bg-[#0738a8] hover:bg-blue-600 text-white font-semibold text-[11px]">
+                  ${state.solSim.playing ? '⏸ Pause Sol Sim' : '▶ Play 1-Sol Cycle'}
+                </button>
+                <button onclick="window.jezeroApp.stepSol(-1800)" class="px-2 py-1.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-mono-tech text-[10px]">-30m</button>
+                <button onclick="window.jezeroApp.stepSol(1800)" class="px-2 py-1.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)] font-mono-tech text-[10px]">+30m</button>
+              </div>
+            </div>
+            <p class="text-[10px] text-[var(--text-muted)] leading-snug">
+              <strong>Model Note:</strong> Simulates solar terminator progression across the 500 km sector over one mean Martian sol (24h 39m 35s) for solar power and thermal planning. Distinct from live rover telemetry.
+            </p>
+          `;
+
+          document.getElementById('solScrubber').addEventListener('input', (e) => {
+            state.solSim.timeSec = Number(e.target.value);
+            updateSolSimulationUI();
+          });
+          document.getElementById('btnSolPlayPause').addEventListener('click', () => {
+            state.solSim.playing = !state.solSim.playing;
+            renderDrawerContent();
+          });
+        } else if (state.activeTab === 'resources') {
+          titleEl.textContent = 'Mars Resources & Mineral Shapes';
+          subEl.textContent = 'Shape + Color Coded Legend';
+          bodyEl.innerHTML = `
+            <div class="p-2 rounded-lg bg-[var(--bg-surface)]/85 border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)]">
+              Each resource class is encoded with both a <strong>distinct geometric shape</strong> and color on the 500 km map for high-contrast legibility.
+            </div>
+            ${MARS_RESOURCES.map((res, rIdx) => `
+              <div class="p-2.5 rounded-lg bg-[var(--bg-surface)]/85 border ${res.enabled ? 'border-sky-400/60' : 'border-[var(--border-subtle)]'} space-y-1">
+                <label class="flex items-center justify-between gap-2 cursor-pointer">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <input type="checkbox" class="chunk-checkbox" ${res.enabled ? 'checked' : ''} onchange="window.jezeroApp.toggleResource(${rIdx}, this.checked)" />
+                    <span class="font-bold text-xs px-1.5 py-0.2 rounded bg-black/40" style="color:${res.color}">${res.shapeLabel}</span>
+                    <span class="font-semibold text-[var(--text-primary)] truncate">${res.name}</span>
+                  </div>
+                </label>
+                <div class="font-mono-tech text-[10px] text-sky-300 pl-6">${res.formula}</div>
+                <p class="text-[11px] text-[var(--text-secondary)] pl-6">${res.utility}</p>
+                <div class="text-[9px] font-mono-tech text-[var(--text-muted)] pl-6">Source: ${res.source}</div>
+              </div>
+            `).join('')}
+          `;
+        }
+        updateRouteBadge();
+      }
+
+      function updateSolSimulationUI() {
+        const sol = getSolarMetrics();
+        const isDay = sol.solarElevDeg > 0;
+        document.getElementById('solHeaderPill').textContent = `LMST ${sol.lmstStr} • ${isDay ? 'DAYLIGHT' : 'NIGHT'}`;
+        const clockEl = document.getElementById('solClockDisplay');
+        if (clockEl) {
+          clockEl.textContent = `${sol.lmstStr} LMST`;
+          document.getElementById('solElevDisplay').textContent = `${sol.solarElevDeg.toFixed(1)}°`;
+          document.getElementById('solAzDisplay').textContent = `${sol.solarAzDeg.toFixed(0)}°`;
+          const scrub = document.getElementById('solScrubber');
+          if (scrub) scrub.value = Math.round(state.solSim.timeSec);
+        }
+      }
+
+      /* ----------------------------------------------------------------------
+         15. UNIFIED GPU-ACCELERATED MOVABLE & RESIZABLE WINDOW MANAGER
+         ---------------------------------------------------------------------- */
+      let topZ = 35;
+      function focusWindow(win) {
+        document.querySelectorAll('[data-window="true"]').forEach((w) => w.classList.remove('focused'));
+        topZ += 1;
+        win.style.zIndex = topZ;
+        win.classList.add('focused');
+      }
+
+      function positionWindowTransform(win, x, y) {
+        const parentRect = win.parentElement.getBoundingClientRect();
+        const maxX = Math.max(0, parentRect.width - Math.min(win.offsetWidth || 240, parentRect.width));
+        const maxY = Math.max(0, parentRect.height - 42);
+        const clampedX = Math.max(0, Math.min(maxX, x));
+        const clampedY = Math.max(0, Math.min(maxY, y));
+        win._tx = clampedX;
+        win._ty = clampedY;
+        win.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+      }
+
+      function resetAllWindowsLayout() {
+        const parentRect = document.getElementById('mapViewport').getBoundingClientRect();
+        document.querySelectorAll('[data-window="true"]').forEach((win) => {
+          const w = Number(win.dataset.w) || 280;
+          const h = Number(win.dataset.h) || 380;
+          win.style.width = `${Math.min(w, parentRect.width - 24)}px`;
+          win.style.height = `${Math.min(h, parentRect.height - 24)}px`;
+
+          let x = 12, y = 12;
+          const dx = win.dataset.x || '12';
+          const dy = win.dataset.y || '12';
+          if (dx.startsWith('right:')) x = parentRect.width - win.offsetWidth - Number(dx.split(':')[1]);
+          else x = Number(dx);
+          if (dy.startsWith('bottom:')) y = parentRect.height - win.offsetHeight - Number(dy.split(':')[1]);
+          else y = Number(dy);
+
+          positionWindowTransform(win, x, y);
+        });
+      }
+
+      function initWindowManager() {
+        document.querySelectorAll('[data-window="true"]').forEach((win) => {
+          win.addEventListener('pointerdown', () => focusWindow(win));
+
+          // Dragging via Header Pointer Capture
+          const handle = win.querySelector('.win-drag-handle');
+          if (handle) {
+            let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+            handle.addEventListener('pointerdown', (e) => {
+              if (e.target.closest('button')) return;
+              dragging = true;
+              focusWindow(win);
+              handle.setPointerCapture(e.pointerId);
+              startX = e.clientX;
+              startY = e.clientY;
+              origX = win._tx || 0;
+              origY = win._ty || 0;
+            });
+            handle.addEventListener('pointermove', (e) => {
+              if (!dragging) return;
+              positionWindowTransform(win, origX + (e.clientX - startX), origY + (e.clientY - startY));
+            });
+            const endDrag = () => { dragging = false; };
+            handle.addEventListener('pointerup', endDrag);
+            handle.addEventListener('pointercancel', endDrag);
+          }
+
+          // Resizing via Bottom-Right Grip Pointer Capture
+          const resizer = win.querySelector('.win-resize-se');
+          if (resizer) {
+            let resizing = false, startX = 0, startY = 0, origW = 0, origH = 0;
+            resizer.addEventListener('pointerdown', (e) => {
+              e.stopPropagation();
+              resizing = true;
+              focusWindow(win);
+              resizer.setPointerCapture(e.pointerId);
+              startX = e.clientX;
+              startY = e.clientY;
+              origW = win.offsetWidth;
+              origH = win.offsetHeight;
+            });
+            resizer.addEventListener('pointermove', (e) => {
+              if (!resizing) return;
+              const parentRect = win.parentElement.getBoundingClientRect();
+              const maxW = parentRect.width - (win._tx || 0) - 6;
+              const maxH = parentRect.height - (win._ty || 0) - 6;
+              const minW = parseInt(win.style.minWidth || '220', 10);
+              const minH = parseInt(win.style.minHeight || '120', 10);
+              win.style.width = `${Math.max(minW, Math.min(maxW, origW + (e.clientX - startX)))}px`;
+              win.style.height = `${Math.max(minH, Math.min(maxH, origH + (e.clientY - startY)))}px`;
+              if (win.id === 'win3DTerrain' && threeState.renderer) resizeThreeViewer();
+            });
+            const endResize = () => { resizing = false; };
+            resizer.addEventListener('pointerup', endResize);
+            resizer.addEventListener('pointercancel', endResize);
+          }
+
+          // Collapse / Minimize Toggle
+          const collapseBtn = win.querySelector('[data-collapse]');
+          if (collapseBtn) {
+            collapseBtn.addEventListener('click', () => {
+              const targetBody = document.getElementById(collapseBtn.dataset.collapse);
+              if (!targetBody) return;
+              const collapsed = targetBody.classList.toggle('hidden');
+              collapseBtn.querySelector('svg').style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+              if (collapsed) {
+                win._expandedH = win.style.height;
+                win.style.height = '38px';
+              } else if (win._expandedH) {
+                win.style.height = win._expandedH;
+              }
+            });
+          }
+        });
+
+        resetAllWindowsLayout();
+      }
+
+      /* ----------------------------------------------------------------------
+         16. THREE.JS 3D TERRAIN FLYOVER VIEWER
+         ---------------------------------------------------------------------- */
+      const threeState = {
+        initialized: false,
+        scene: null,
+        camera: null,
+        renderer: null,
+        mesh: null,
+        exaggeration: 8,
+        orbit: { theta: 0.65, phi: 0.92, radius: 135, dragging: false, lastX: 0, lastY: 0 }
+      };
+
+      function initThreeTerrainViewer() {
+        if (threeState.initialized || typeof THREE === 'undefined') return;
+        const container = document.getElementById('threeContainer');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x090b0f);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / Math.max(1, container.clientHeight), 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.insertBefore(renderer.domElement, container.firstChild);
+
+        const segs = 128;
+        const geo = new THREE.PlaneGeometry(110, 110, segs, segs);
+        geo.rotateX(-Math.PI / 2);
+
+        const colors = new Float32Array((segs + 1) * (segs + 1) * 3);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const ix = i % (segs + 1);
+          const iy = Math.floor(i / (segs + 1));
+          const gx = Math.min(DEM_SIZE - 1, Math.round((ix / segs) * (DEM_SIZE - 1)));
+          const gy = Math.min(DEM_SIZE - 1, Math.round((iy / segs) * (DEM_SIZE - 1)));
+          const idx = gy * DEM_SIZE + gx;
+          const elev = dem.elev[idx];
+          pos.setY(i, ((elev + 2600) / 1000) * threeState.exaggeration);
+
+          const alb = dem.albedo[idx];
+          colors[i * 3] = Math.min(1, alb * 1.15 + 0.12);
+          colors[i * 3 + 1] = Math.min(1, alb * 0.92 + 0.10);
+          colors[i * 3 + 2] = Math.min(1, alb * 0.76 + 0.10);
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.05 });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.35);
+        sunLight.position.set(80, 110, 60);
+        scene.add(sunLight);
+        scene.add(new THREE.AmbientLight(0x3b5998, 0.45));
+
+        threeState.scene = scene;
+        threeState.camera = camera;
+        threeState.renderer = renderer;
+        threeState.mesh = mesh;
+        threeState.initialized = true;
+
+        const dom = renderer.domElement;
+        dom.addEventListener('pointerdown', (e) => {
+          threeState.orbit.dragging = true;
+          threeState.orbit.lastX = e.clientX;
+          threeState.orbit.lastY = e.clientY;
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!threeState.orbit.dragging) return;
+          threeState.orbit.theta -= (e.clientX - threeState.orbit.lastX) * 0.008;
+          threeState.orbit.phi = Math.max(0.25, Math.min(1.42, threeState.orbit.phi - (e.clientY - threeState.orbit.lastY) * 0.008));
+          threeState.orbit.lastX = e.clientX;
+          threeState.orbit.lastY = e.clientY;
+        });
+        window.addEventListener('pointerup', () => { threeState.orbit.dragging = false; });
+        dom.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          threeState.orbit.radius = Math.max(45, Math.min(240, threeState.orbit.radius + e.deltaY * 0.08));
+        }, { passive: false });
+      }
+
+      function resizeThreeViewer() {
+        if (!threeState.initialized) return;
+        const container = document.getElementById('threeContainer');
+        threeState.camera.aspect = container.clientWidth / Math.max(1, container.clientHeight);
+        threeState.camera.updateProjectionMatrix();
+        threeState.renderer.setSize(container.clientWidth, container.clientHeight);
+      }
+
+      function renderThreeViewer() {
+        if (!threeState.initialized || document.getElementById('win3DTerrain').classList.contains('hidden')) return;
+        const o = threeState.orbit;
+        threeState.camera.position.set(
+          o.radius * Math.sin(o.phi) * Math.sin(o.theta),
+          o.radius * Math.cos(o.phi),
+          o.radius * Math.sin(o.phi) * Math.cos(o.theta)
+        );
+        threeState.camera.lookAt(0, 0, 0);
+        threeState.renderer.render(threeState.scene, threeState.camera);
+      }
+
+      /* ----------------------------------------------------------------------
+         17. MULTI-TOUCH PINCH-TO-ZOOM & PAN ON PRIMARY MAP CANVAS
+         ---------------------------------------------------------------------- */
+      const activePointers = new Map();
+      let pinchStartDist = 0, pinchStartZoom = 1;
+      let pointerDownOrigin = { x: 0, y: 0 };
+      let panStartCam = { lon: 0, lat: 0 };
+
+      function findWaypointNear(sx, sy) {
+        const wps = getActiveRoute().waypoints;
+        for (let i = wps.length - 1; i >= 0; i--) {
+          const p = geoToScreen(wps[i].lon, wps[i].lat);
+          if (Math.hypot(sx - p.x, sy - p.y) <= 16) return i;
+        }
+        return -1;
+      }
+
+      function findRoverSiteNear(sx, sy) {
+        if (!state.layers.roverMarkers) return null;
+        for (const site of ROVER_IMAGERY_SITES) {
+          const p = geoToScreen(site.lon, site.lat);
+          if (Math.hypot(sx - p.x, sy - p.y) <= 18) return site;
+        }
+        return null;
+      }
+
+      canvas.addEventListener('pointerdown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        activePointers.set(e.pointerId, { x: sx, y: sy });
+        canvas.setPointerCapture(e.pointerId);
+
+        if (activePointers.size === 1) {
+          pointerDownOrigin = { x: sx, y: sy };
+          const wpIdx = findWaypointNear(sx, sy);
+          if (wpIdx !== -1) {
+            state.draggingWaypointIdx = wpIdx;
+            return;
+          }
+          panStartCam = { lon: state.camera.centerLon, lat: state.camera.centerLat };
+          canvas.classList.add('grabbing');
+        } else if (activePointers.size === 2) {
+          state.draggingWaypointIdx = -1;
+          const pts = Array.from(activePointers.values());
+          pinchStartDist = Math.max(10, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+          pinchStartZoom = state.camera.zoom;
+        }
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const geo = screenToGeo(sx, sy);
+        updateTelemetry(geo.lon, geo.lat);
+
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, { x: sx, y: sy });
+
+        if (state.draggingWaypointIdx !== -1 && activePointers.size === 1) {
+          const route = getActiveRoute();
+          route.waypoints[state.draggingWaypointIdx].lon = geo.lon;
+          route.waypoints[state.draggingWaypointIdx].lat = geo.lat;
+          route.optimizedNote = null;
+          if (state.activeTab === 'routes') renderDrawerContent();
+          return;
+        }
+
+        if (activePointers.size === 1) {
+          const ppd = getPixelsPerDegree();
+          const aspect = KM_PER_DEG_LAT / KM_PER_DEG_LON;
+          state.camera.centerLon = panStartCam.lon - (sx - pointerDownOrigin.x) / ppd;
+          state.camera.centerLat = panStartCam.lat + (sy - pointerDownOrigin.y) / (ppd * aspect);
+        } else if (activePointers.size === 2) {
+          const pts = Array.from(activePointers.values());
+          const midX = (pts[0].x + pts[1].x) / 2;
+          const midY = (pts[0].y + pts[1].y) / 2;
+          const beforeGeo = screenToGeo(midX, midY);
+
+          const curDist = Math.max(10, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+          state.camera.zoom = Math.max(0.55, Math.min(24, pinchStartZoom * (curDist / pinchStartDist)));
+
+          const afterGeo = screenToGeo(midX, midY);
+          state.camera.centerLon += beforeGeo.lon - afterGeo.lon;
+          state.camera.centerLat += beforeGeo.lat - afterGeo.lat;
+        }
+      });
+
+      function handlePointerEnd(e) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const wasSingleTap =
+          activePointers.size === 1 &&
+          Math.hypot(sx - pointerDownOrigin.x, sy - pointerDownOrigin.y) < 6;
+
+        activePointers.delete(e.pointerId);
+        if (activePointers.size === 0) canvas.classList.remove('grabbing');
+
+        if (state.draggingWaypointIdx !== -1) {
+          state.draggingWaypointIdx = -1;
+          if (state.activeTab === 'routes') renderDrawerContent();
+          return;
+        }
+
+        if (wasSingleTap) {
+          const hitRover = findRoverSiteNear(sx, sy);
+          if (hitRover) {
+            openRoverImageryWindow(hitRover);
+            return;
+          }
+          if (state.routeClickMode) {
+            const geo = screenToGeo(sx, sy);
+            const route = getActiveRoute();
+            route.waypoints.push({
+              id: `wp-${Date.now()}`,
+              name: `Waypoint ${route.waypoints.length + 1}`,
+              lat: geo.lat,
+              lon: geo.lon
+            });
+            route.optimizedNote = null;
+            updateRouteBadge();
+            if (state.activeTab === 'routes') renderDrawerContent();
+            else openTabDrawer('routes');
+          }
+        }
+      }
+
+      canvas.addEventListener('pointerup', handlePointerEnd);
+      canvas.addEventListener('pointercancel', handlePointerEnd);
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const beforeGeo = screenToGeo(sx, sy);
+        const factor = e.deltaY < 0 ? 1.18 : 1 / 1.18;
+        state.camera.zoom = Math.max(0.55, Math.min(24, state.camera.zoom * factor));
+        const afterGeo = screenToGeo(sx, sy);
+        state.camera.centerLon += beforeGeo.lon - afterGeo.lon;
+        state.camera.centerLat += beforeGeo.lat - afterGeo.lat;
+      }, { passive: false });
+
+      /* ----------------------------------------------------------------------
+         18. UI EVENT LISTENERS & PUBLIC HANDLERS
+         ---------------------------------------------------------------------- */
+      const LEGENDS = {
+        satellite: { title: 'Regional Albedo & Relief Mosaic [ESTIMATED]', grad: 'linear-gradient(to right, #1f1b18, #7d6755, #dfd0be)', labels: ['Basalt', 'Regolith', 'Carbonate'] },
+        simplified: { title: 'Geological Provinces Grid [ESTIMATED]', grad: 'linear-gradient(to right, #18448e, #146898, #947a60, #4a5260)', labels: ['Jezero', 'Isidis', 'Scarps', 'Highlands'] },
+        elevation: { title: 'MOLA Regional Elevation (-3,800m to -200m)', grad: 'linear-gradient(to right, #14328c, #247edf, #4cc88a, #e7a52b, #f7f0e6)', labels: ['-3.8km', '-2.5km', '-1.4km', '-0.2km'] },
+        thermal: { title: 'THEMIS Thermal Inertia [ESTIMATED]', grad: 'linear-gradient(to right, #26146e, #9c2b7d, #e86f2c, #fce356)', labels: ['200 (Dust)', '345', '490+ (Bedrock)'] },
+        atmospheric: { title: 'Atmospheric Column Pressure & Dust (Pa / τ)', grad: 'linear-gradient(to right, #12348c, #3b82f6, #38bdf8, #a5f3fc)', labels: ['620 Pa', '740 Pa', '870 Pa'] },
+        slope: { title: 'Terrain Slope Gradient (Degrees)', grad: 'linear-gradient(to right, #163a5e, #20886e, #d69e24, #e2303e)', labels: ['<5°', '5–10°', '10–15°', '>15°'] }
+      };
+
+      function setViewMode(mode) {
+        state.viewMode = mode;
+        document.getElementById('activeViewBadge').textContent = mode.toUpperCase();
+        document.querySelectorAll('.view-btn').forEach((btn) => {
+          const active = btn.dataset.view === mode;
+          btn.className = active
+            ? 'view-btn active text-left px-2.5 py-1.5 rounded-md border border-sky-400/50 bg-[#0738a8] text-white font-medium flex items-center justify-between'
+            : 'view-btn text-left px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]/75 hover:bg-[var(--bg-surface-hover)] flex items-center justify-between';
+        });
+        const l = LEGENDS[mode];
+        document.getElementById('viewLegendTitle').textContent = l.title;
+        document.getElementById('viewLegendBar').style.background = l.grad;
+        document.getElementById('viewLegendLabels').innerHTML = l.labels.map(x => `<span>${x}</span>`).join('');
+      }
+
+      function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function initUI() {
+        let headCollapsed = false;
+        document.getElementById('btnCollapseHeader').addEventListener('click', () => {
+          headCollapsed = !headCollapsed;
+          document.getElementById('headerBrandRow').style.display = headCollapsed ? 'none' : 'flex';
+          document.getElementById('chevronHeader').style.transform = headCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
+          resizeCanvas();
+        });
+
+        document.getElementById('btnThemeToggle').addEventListener('click', () => {
+          state.theme = state.theme === 'dark' ? 'light' : 'dark';
+          document.documentElement.classList.toggle('light', state.theme === 'light');
+          document.documentElement.classList.toggle('dark', state.theme === 'dark');
+          document.getElementById('iconSun').classList.toggle('hidden', state.theme === 'dark');
+          document.getElementById('iconMoon').classList.toggle('hidden', state.theme === 'light');
+          document.getElementById('themeLabel').textContent = state.theme === 'dark' ? 'Dark' : 'Light';
+        });
+
+        document.getElementById('btnToggleLiveTiles').addEventListener('click', () => {
+          state.useLiveTiles = !state.useLiveTiles;
+          document.getElementById('tileStatusDot').className = state.useLiveTiles
+            ? 'w-2 h-2 rounded-full bg-emerald-400'
+            : 'w-2 h-2 rounded-full bg-amber-400';
+          document.getElementById('tileStatusLabel').textContent = state.useLiveTiles ? 'DEM + NASA WMTS' : 'Regional DEM Only';
+        });
+
+        document.getElementById('btnResetLayout').addEventListener('click', resetAllWindowsLayout);
+
+        // 3D Terrain Flyover Window Toggle
+        document.getElementById('btnToggle3DWin').addEventListener('click', () => {
+          const win = document.getElementById('win3DTerrain');
+          const hidden = win.classList.toggle('hidden');
+          if (!hidden) {
+            focusWindow(win);
+            initThreeTerrainViewer();
+            resizeThreeViewer();
+          }
+        });
+        document.getElementById('btnClose3DWin').addEventListener('click', () => {
+          document.getElementById('win3DTerrain').classList.add('hidden');
+        });
+        document.getElementById('btn3DExaggeration').addEventListener('click', () => {
+          if (!threeState.initialized) return;
+          threeState.exaggeration = threeState.exaggeration === 8 ? 16 : threeState.exaggeration === 16 ? 4 : 8;
+          document.getElementById('btn3DExaggeration').textContent = `Z-Scale: ${threeState.exaggeration}x`;
+          const pos = threeState.mesh.geometry.attributes.position;
+          const segs = 128;
+          for (let i = 0; i < pos.count; i++) {
+            const ix = i % (segs + 1);
+            const iy = Math.floor(i / (segs + 1));
+            const gx = Math.min(DEM_SIZE - 1, Math.round((ix / segs) * (DEM_SIZE - 1)));
+            const gy = Math.min(DEM_SIZE - 1, Math.round((iy / segs) * (DEM_SIZE - 1)));
+            pos.setY(i, ((dem.elev[gy * DEM_SIZE + gx] + 2600) / 1000) * threeState.exaggeration);
+          }
+          pos.needsUpdate = true;
+          threeState.mesh.geometry.computeVertexNormals();
+        });
+
+        // Stratigraphic Core & Comms Relay Window
+        document.getElementById('btnToggleCoreWin').addEventListener('click', () => {
+          const win = document.getElementById('winCoreRelay');
+          const hidden = win.classList.toggle('hidden');
+          if (!hidden) {
+            focusWindow(win);
+            renderDrillCoreGraphic(document.getElementById('selectDrillCore').value);
+          }
+        });
+        document.getElementById('btnCloseCoreWin').addEventListener('click', () => {
+          document.getElementById('winCoreRelay').classList.add('hidden');
+        });
+        document.getElementById('selectDrillCore').addEventListener('change', (e) => renderDrillCoreGraphic(e.target.value));
+        document.getElementById('owltSlider').addEventListener('input', (e) => {
+          document.getElementById('owltLabel').textContent = `${e.target.value}m 00s`;
+        });
+        document.getElementById('btnTestUplink').addEventListener('click', () => {
+          const mins = document.getElementById('owltSlider').value;
+          const st = document.getElementById('relayStatusText');
+          st.textContent = `Transmitting command (${mins}m light-time)...`;
+          setTimeout(() => { st.textContent = `Uplink queued via MRO Electra (${mins}m OWLT)`; }, 900);
+        });
+
+        // Sources Modal
+        const modal = document.getElementById('sourcesModal');
+        document.getElementById('btnOpenSources').addEventListener('click', () => modal.classList.remove('hidden'));
+        document.getElementById('btnCloseSources').addEventListener('click', () => modal.classList.add('hidden'));
+        document.getElementById('btnCloseSourcesFooter').addEventListener('click', () => modal.classList.add('hidden'));
+
+        // Radiation SPE Toggle
+        document.getElementById('btnToggleSpeSim').addEventListener('click', () => {
+          state.speStormSim = !state.speStormSim;
+          document.getElementById('radDoseValue').textContent = state.speStormSim ? '~18.4 mSv / sol' : '~0.66 mSv / sol';
+          document.getElementById('radDoseValue').className = state.speStormSim ? 'text-xs font-bold text-rose-400' : 'text-xs font-bold text-emerald-400';
+          document.getElementById('radBadge').textContent = state.speStormSim ? 'SPE [SIMULATED]' : 'MSL RAD REF';
+          document.getElementById('btnToggleSpeSim').textContent = state.speStormSim ? 'SPE Storm (Reset)' : 'Nominal GCR (Toggle SPE)';
+        });
+
+        // Navigation Tabs & Drawer
+        document.querySelectorAll('.nav-tab').forEach((t) => t.addEventListener('click', () => openTabDrawer(t.dataset.tab)));
+        document.getElementById('btnCloseDrawer').addEventListener('click', () => {
+          state.activeTab = null;
+          document.getElementById('winDrawer').classList.add('hidden');
+          document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
+        });
+
+        // Rover Imagery Window Controls
+        document.getElementById('btnCloseRoverImg').addEventListener('click', () => {
+          document.getElementById('winRoverImage').classList.add('hidden');
+        });
+        document.getElementById('btnAddRoverSiteToRoute').addEventListener('click', () => {
+          if (!state.selectedRoverSite) return;
+          const r = getActiveRoute();
+          r.waypoints.push({ id: `wp-${Date.now()}`, name: state.selectedRoverSite.name, lat: state.selectedRoverSite.lat, lon: state.selectedRoverSite.lon });
+          updateRouteBadge();
+          if (state.activeTab === 'routes') renderDrawerContent();
+        });
+
+        // View Mode & Overlay Checkboxes
+        document.querySelectorAll('.view-btn').forEach((btn) => btn.addEventListener('click', () => setViewMode(btn.dataset.view)));
+        document.querySelectorAll('.layer-toggle').forEach((cb) => {
+          cb.addEventListener('change', (e) => {
+            state.layers[e.target.dataset.layer] = e.target.checked;
+            if (e.target.dataset.layer === 'contours') {
+              document.getElementById('btnQuickContourToggle').textContent = `Contours: ${e.target.checked ? 'ON' : 'OFF'}`;
+            }
+          });
+        });
+
+        const syncGrid = (val) => {
+          state.showGrid = val;
+          document.getElementById('chkGridLines').checked = val;
+          document.getElementById('btnQuickGridToggle').textContent = `Grid: ${val ? 'ON' : 'OFF'}`;
+        };
+        document.getElementById('chkGridLines').addEventListener('change', (e) => syncGrid(e.target.checked));
+        document.getElementById('btnQuickGridToggle').addEventListener('click', () => syncGrid(!state.showGrid));
+        document.getElementById('btnQuickContourToggle').addEventListener('click', () => {
+          state.layers.contours = !state.layers.contours;
+          document.getElementById('chkContours').checked = state.layers.contours;
+          document.getElementById('btnQuickContourToggle').textContent = `Contours: ${state.layers.contours ? 'ON' : 'OFF'}`;
+        });
+
+        document.getElementById('btnToggleAllLayers').addEventListener('click', () => {
+          const next = !Object.values(state.layers).every(Boolean);
+          Object.keys(state.layers).forEach((k) => { state.layers[k] = next; });
+          document.querySelectorAll('.layer-toggle').forEach((cb) => { cb.checked = next; });
+          syncGrid(next);
+        });
+
+        // Zoom & Reset Controls
+        document.getElementById('btnZoomIn').addEventListener('click', () => { state.camera.zoom = Math.min(24, state.camera.zoom * 1.4); });
+        document.getElementById('btnZoomOut').addEventListener('click', () => { state.camera.zoom = Math.max(0.55, state.camera.zoom / 1.4); });
+        document.getElementById('btnResetView').addEventListener('click', () => {
+          state.camera.centerLon = JEZERO_CENTER.lon;
+          state.camera.centerLat = JEZERO_CENTER.lat;
+          state.camera.zoom = 1.0;
+        });
+
+        document.getElementById('quickRouteModeBtn').addEventListener('click', () => window.jezeroApp.toggleRouteClickMode());
+      }
+
+      /* ----------------------------------------------------------------------
+         19. PUBLIC API FOR INLINE DRAWER ACTIONS
+         ---------------------------------------------------------------------- */
+      window.jezeroApp = {
+        flyTo(lon, lat, zoom = 2.4) {
+          state.camera.centerLon = lon;
+          state.camera.centerLat = lat;
+          state.camera.zoom = zoom;
+        },
+        inspectRoverSite(id) {
+          const site = ROVER_IMAGERY_SITES.find((s) => s.id === id);
+          if (site) {
+            this.flyTo(site.lon, site.lat, 5.5);
+            openRoverImageryWindow(site);
+          }
+        },
+        toggleRouteClickMode() {
+          state.routeClickMode = !state.routeClickMode;
+          canvas.classList.toggle('route-cursor', state.routeClickMode);
+          document.getElementById('quickRouteModeText').textContent = `Map Pin: ${state.routeClickMode ? 'ON' : 'OFF'}`;
+          document.getElementById('quickRouteDot').className = state.routeClickMode
+            ? 'w-2 h-2 rounded-full bg-amber-400 animate-pulse'
+            : 'w-2 h-2 rounded-full bg-slate-400';
+          if (state.activeTab === 'routes') renderDrawerContent();
+        },
+        selectRoute(id) { state.activeRouteId = id; updateRouteBadge(); renderDrawerContent(); },
+        addRoute() {
+          const newR = {
+            id: `route-${Date.now()}`,
+            name: `Regional Traverse #${state.routes.length + 1}`,
+            optimizedNote: null,
+            waypoints: [
+              { id: `w-${Date.now()}-1`, name: 'Octavia E. Butler Landing', lat: 18.4447, lon: 77.4508 },
+              { id: `w-${Date.now()}-2`, name: 'Hargraves Crater Rim', lat: 20.7500, lon: 75.7500 }
+            ]
+          };
+          state.routes.push(newR);
+          state.activeRouteId = newR.id;
+          updateRouteBadge();
+          renderDrawerContent();
+        },
+        deleteActiveRoute() {
+          if (state.routes.length <= 1) state.routes[0].waypoints = [];
+          else {
+            state.routes = state.routes.filter((r) => r.id !== state.activeRouteId);
+            state.activeRouteId = state.routes[0].id;
+          }
+          updateRouteBadge();
+          renderDrawerContent();
+        },
+        setEndpoint(posIdx, val) {
+          if (!val) return;
+          const [latStr, lonStr, ...nameParts] = val.split(',');
+          const r = getActiveRoute();
+          const wp = { id: `ep-${Date.now()}`, name: nameParts.join(','), lat: Number(latStr), lon: Number(lonStr) };
+          if (r.waypoints.length === 0) r.waypoints.push(wp);
+          else if (posIdx === 0) r.waypoints[0] = wp;
+          else r.waypoints[r.waypoints.length - 1] = wp;
+          r.optimizedNote = null;
+          renderDrawerContent();
+        },
+        renameWaypoint(idx, newName) {
+          const r = getActiveRoute();
+          if (r.waypoints[idx]) r.waypoints[idx].name = newName.trim() || `Waypoint ${idx + 1}`;
+        },
+        deleteWaypoint(idx) {
+          const r = getActiveRoute();
+          r.waypoints.splice(idx, 1);
+          updateRouteBadge();
+          renderDrawerContent();
+        },
+        runOptimizeSafe() {
+          optimizeRouteSafest(getActiveRoute());
+          updateRouteBadge();
+          renderDrawerContent();
+        },
+        runOptimizeScience() {
+          optimizeRouteScientific(getActiveRoute());
+          updateRouteBadge();
+          renderDrawerContent();
+        },
+        toggleResource(idx, enabled) {
+          MARS_RESOURCES[idx].enabled = enabled;
+        },
+        stepSol(deltaSec) {
+          state.solSim.timeSec = (state.solSim.timeSec + deltaSec + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
+          updateSolSimulationUI();
+        },
+        exportGeoJSON() {
+          const r = getActiveRoute();
+          const geojson = {
+            type: 'FeatureCollection',
+            properties: { name: r.name, disclaimer: 'PLANNING ESTIMATE ONLY — NOT FOR AUTONOMOUS NAVIGATION' },
+            features: [
+              {
+                type: 'Feature',
+                properties: { name: r.name },
+                geometry: { type: 'LineString', coordinates: r.waypoints.map((w) => [w.lon, w.lat]) }
+              },
+              ...r.waypoints.map((w, i) => ({
+                type: 'Feature',
+                properties: { index: i + 1, name: w.name },
+                geometry: { type: 'Point', coordinates: [w.lon, w.lat] }
+              }))
+            ]
+          };
+          downloadTextFile(`${r.name.replace(/\s+/g, '_')}.geojson`, JSON.stringify(geojson, null, 2), 'application/geo+json');
+        },
+        exportCSV() {
+          const r = getActiveRoute();
+          const rows = ['index,name,latitude_N,longitude_E,elev_m,slope_deg'];
+          r.waypoints.forEach((w, i) => {
+            const s = sampleDEM(w.lon, w.lat);
+            rows.push(`${i + 1},"${w.name}",${w.lat.toFixed(5)},${w.lon.toFixed(5)},${s.elev},${s.slope.toFixed(1)}`);
+          });
+          downloadTextFile(`${r.name.replace(/\s+/g, '_')}.csv`, rows.join('\n'), 'text/csv');
+        }
+      };
+
+      function downloadTextFile(filename, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      /* ----------------------------------------------------------------------
+         20. MAIN 60FPS ANIMATION LOOP & BOOTSTRAP
+         ---------------------------------------------------------------------- */
+      let lastTime = performance.now();
+      function frameLoop(now) {
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        if (state.solSim.playing) {
+          state.solSim.timeSec = (state.solSim.timeSec + dt * state.solSim.speed) % MARS_SOL_SECONDS;
+          updateSolSimulationUI();
+        }
+
+        renderMap();
+        renderThreeViewer();
+        requestAnimationFrame(frameLoop);
+      }
+
+      build500KmRegionalDEM();
+      initUI();
+      initWindowManager();
+      updateTelemetry(JEZERO_CENTER.lon, JEZERO_CENTER.lat);
+      updateSolSimulationUI();
+      updateRouteBadge();
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        resizeThreeViewer();
+      });
+      resizeCanvas();
+      requestAnimationFrame(frameLoop);
+    })();
+  </script>
+</body>
+</html>
